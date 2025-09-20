@@ -1,7 +1,8 @@
 import numpy as np
 import pandas as pd
-from sklearn.model_selection import train_test_split
 from scipy import stats
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import MinMaxScaler, StandardScaler
 
 def split_dataframe_train_test(dataframe: pd.DataFrame, target: str, random_state: int, test_size:float = 0.3) -> tuple:
     """
@@ -49,20 +50,24 @@ def imputar_ceros_con_metrica(data: pd.Series, metrica: str = "mean") -> pd.Seri
     
     return data.replace(0, valor_metrica)
 
-def aplicar_transformaciones_inline(dataframe: pd.DataFrame, transformacion:str = "boxcox"):
+def aplicar_transformaciones_inline(dataframe: pd.DataFrame, transformacion:str = "boxcox", columnas: list[str] = []):
     """
     Aplica transformaciones "inline" sobre un dataframe.
 
     Args:
         dataframe: Dataframe sobre el cual se aplicarán transformaciones a todas sus columnas.
         transformacion: Técnica a aplicar. Puede ser boxcox, sqrt o log1p. Default: boxcox.
+        columnas: columnas a procesar. Default: empty list (se procesarán todas las columnas).
     Raises:
         ValueError: si el valor de 'transformacion' es erróneo.
     """
     if transformacion not in ["boxcox", "sqrt", "log1p"]:
             raise ValueError("Valor del parámetro 'transformacion' incorrecto. Debe ser 'boxcox', 'sqrt' o 'log1p'.")
     
-    for col in dataframe.columns:
+    if columnas == []:
+        columnas = dataframe.columns
+
+    for col in columnas:
         match transformacion:
             case "boxcox":
                 dataframe[col], _ = stats.boxcox(dataframe[col])
@@ -74,7 +79,7 @@ def aplicar_transformaciones_inline(dataframe: pd.DataFrame, transformacion:str 
 def agregar_bmi(dataframe: pd.DataFrame, heightCol: str = "Height", weightCol: str = "Weight", bmiCol:str = "BMI"):
     """
     Calcula el BMI a un dataframe dado, en función de las columnas heightCol y weightCol.
-    Agrega la columna BMI inline
+    Agrega la columna BMI inline.
 
     Args:
         dataframe: Dataframe sobre el cual se trabajará.
@@ -114,7 +119,7 @@ def categorizar_bmi(dataframe: pd.DataFrame, bmiCol:str = "BMI", categoryCol: st
     dataframe[categoryCol] = pd.cut(dataframe[bmiCol], bins=bins, labels=labels, right=False)
 
 def one_hot_encoding_bmi(train: pd.DataFrame, test: pd.DataFrame, categoryCol: str = "BMI_cat",
-                         prefix: str = "BMI") -> tuple[pd.DataFrame, pd.DataFrame]:
+                         prefix: str = "BMI") -> tuple[pd.DataFrame, pd.DataFrame, list[str]]:
     """
     Aplica one hot encoding a las categorías de BMI en dataframes de train y test.
     NO es un método inline.
@@ -125,7 +130,7 @@ def one_hot_encoding_bmi(train: pd.DataFrame, test: pd.DataFrame, categoryCol: s
         categoryCol: nombre de la columna con categorías de BMI. Default a "BMI_cat".
         prefix: prefijo de las nuevas columnas. Default a "BMI".
     Returns:
-        tuple: nuevos dataframes de train y test.
+        tuple: nuevos dataframes de train y test, y la lista con las nuevas columnas.
     Raises:
         ValueError: si categoryCol no existe los dataframes especificados.
     """
@@ -140,4 +145,107 @@ def one_hot_encoding_bmi(train: pd.DataFrame, test: pd.DataFrame, categoryCol: s
     train = pd.concat([train.drop(columns=[categoryCol]), bmi_train], axis=1)
     test  = pd.concat([test.drop(columns=[categoryCol]),  bmi_test],  axis=1)
 
+    return train, test, bmi_cols
+
+def codificar_dummy_feature(train: pd.DataFrame, test: pd.DataFrame,
+                            categoryCols: list[str]) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """
+    Codifica dummy/ies feature/s.
+
+    Args:
+        train: DataFrame de train.
+        test: DataFrame de test.
+        categoryCols: lista de nombres de la columnas con categorías de BMI. Estas serán reescritas con los dummies.
+    Returns:
+        tuple: nuevos dataframes de train y test.
+    Raises:
+        ValueError: si categoryCol no existe los dataframes especificados.
+    """
+    for categoryCol in categoryCols:
+        if categoryCol not in train.columns or categoryCol not in test.columns:
+            raise ValueError(f"La columna {categoryCol} no existe en los dataframe especificados.")
+        
+    bmi_train = pd.get_dummies(train[categoryCols], dtype=int)
+
+    bmi_cols = bmi_train.columns
+    bmi_test  = pd.get_dummies(test[categoryCols], dtype=int).reindex(columns=bmi_cols, fill_value=0)
+
+    train = pd.concat([train.drop(columns=categoryCols), bmi_train], axis=1)
+    test = pd.concat([test.drop(columns=categoryCols),  bmi_test],  axis=1)
+
     return train, test
+
+def escalar_features(train: pd.DataFrame, test: pd.DataFrame, scaler: str = "StandardScaler",  columnas: list[str] = []):
+    """
+    Escala las features del dataset de train y test.
+    
+    Args:
+        train: DataFrame de train.
+        test: DataFrame de test.
+        scaler: Nombre del scaler a implementar. Puede ser 'StandardScaler' o 'MinMaxScaler'
+        columnas: columnas a procesar. Default: empty list (se procesarán todas las columnas).
+    Raises:
+        ValueError: el valor de scaler es erróneo.
+    """
+    if scaler not in ["StandardScaler", "MinMaxScaler"]:
+        raise ValueError(f"El valor {scaler} del parámetro 'scaler' es erróneo. Los posibles valores son StandardScaler, MinMaxScaler.")
+    
+    if columnas == []:
+        columnas = train.columns
+
+    match scaler:
+        case "StandardScaler":
+            scaler = StandardScaler()
+        case _: # MinMaxScaler
+            scaler = MinMaxScaler()
+    
+    train.loc[:, columnas] = np.float64(scaler.fit_transform(train[columnas]))
+    test.loc[:, columnas] = np.float64(scaler.transform(test[columnas]))
+
+def procesar_dataframe_completo(dataframe: pd.DataFrame, target: str, random_state: int,
+                     test_size:float = 0.3) -> tuple[pd.DataFrame, pd.DataFrame, pd.Series, pd.Series]:
+    """
+    Procesa todo el dataframe.
+
+    Args:
+        dataframe: Dataframe sobre el cual se realizará el procesamiento.
+        target: Variable target.
+        random_state: Random State, que nos permitirá obtener siempre el mismo resultado.
+        test_size: Tamaño del set de test. Default a 0.3.
+    Returns:
+        Tuple: X_train, X_test, y_train, y_test
+    """
+    X_train, X_test, y_train, y_test = split_dataframe_train_test(dataframe=dataframe,
+                                                                  target=target,
+                                                                  random_state=random_state,
+                                                                  test_size=test_size)
+    
+    # Nueva feature: BMI + BMI_cat
+    colBMI = "BMI"
+    colBMI_cat = "BMI_cat"
+
+    agregar_bmi(X_train, bmiCol=colBMI)
+    categorizar_bmi(X_train, bmiCol=colBMI, categoryCol=colBMI_cat)
+
+    agregar_bmi(X_test, bmiCol=colBMI)
+    categorizar_bmi(X_test, bmiCol=colBMI, categoryCol=colBMI_cat)
+
+    cols_a_transformar = list(set(X_train.columns) - set([colBMI_cat]))
+    # Tratamiento de outliers con transformación Boxcox.
+    # Aplica solo a las columna numéricas.
+    aplicar_transformaciones_inline(dataframe=X_train, columnas=cols_a_transformar)
+    aplicar_transformaciones_inline(dataframe=X_test, columnas=cols_a_transformar)
+
+    X_train, X_test, new_cols_bmi = one_hot_encoding_bmi(train=X_train,
+                                                         test=X_test,
+                                                         categoryCol=colBMI_cat,
+                                                         prefix=colBMI)
+
+    X_train, X_test = codificar_dummy_feature(train=X_train, test=X_test,
+                                              categoryCols=new_cols_bmi)
+    
+    cols_a_escalar = list(set(X_train.columns) - set(new_cols_bmi))
+    escalar_features(train=X_train, test=X_test,
+                     scaler="StandardScaler", columnas=cols_a_escalar)
+
+    return X_train, X_test, y_train, y_test
