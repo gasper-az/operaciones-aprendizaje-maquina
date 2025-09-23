@@ -55,11 +55,14 @@ Entrega final
 │ └── requirements.txt
 │
 ├── utilities/
-│ └── scripts/ # Scripts auxiliares
+│   └── scripts/
+│       └── mlflow.sql 
 │ ├── seed_minio.sh # Inicializar buckets y subir dataset
 │ └── promote_model.py # Promover modelo en MLflow Registry
 │
-├── DOCKERFILES/ # Dockerfiles personalizados (opcional)
+├── dockerfiles/
+│   └── airflow/
+│       └── Dockerfile     
 │
 ├── requirements.txt # Dependencias globales del proyecto
 ├── mlflow.sql # Script de inicialización de la DB de MLflow
