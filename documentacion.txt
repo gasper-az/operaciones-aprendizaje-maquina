@@ -1,0 +1,27 @@
+Resumen de avances
+=====================
+
+** Estructura del proyecto
+- Armamos carpetas: notebooks/, dockerfiles/, utilities/scripts/, etc.
+- Creamos requirements.txt con librerías necesarias (mlflow, boto3, psycopg2-binary, etc.).
+
+**Docker Compose
+- Configuramos un docker-compose.yaml que levanta los servicios:
+  - Postgres → base de datos para Airflow y MLflow.
+  - Redis (Valkey) → backend de mensajes para Airflow.
+  - MinIO → almacenamiento S3 local para los artefactos de MLflow.
+  - MLflow → servidor de experimentos, conectado a Postgres y MinIO.
+  - Airflow (scheduler, worker, webserver) → orquestación de flujos de datos y entrenamientos.
+
+** Configuraciones extra
+- Variables de entorno (.env) para MLflow y MinIO.
+- Script mlflow.sql montado en Postgres para crear la DB mlflow_db.
+- Montaje de requirements.txt en el contenedor MLflow para instalar dependencias faltantes.
+- Ajuste de command en el servicio MLflow para que efectivamente levante el servidor web en el puerto 5001.
+
+Con esto ya tenemos la infraestructura levantada:
+=====================================================
+* Postgres corriendo en localhost:5432
+* MinIO corriendo en localhost:9000 (API) y localhost:9101 (UI Web)
+* MLflow en localhost:5001 (UI Web)
+* Airflow en localhost:8080 (UI Web)
