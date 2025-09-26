@@ -59,7 +59,6 @@ x-airflow-common: &airflow-common
     redis:
       condition: service_healthy
 
-
 services:
   mlflow:
     image: ghcr.io/mlflow/mlflow:v2.10.2
@@ -118,7 +117,7 @@ services:
 
   postgres:
     restart: always
-    image: postgres:13
+    image: postgres:17
     container_name: postgres
     ports:
       - "${PG_PORT:-5432}:5432"
@@ -129,6 +128,7 @@ services:
       - POSTGRES_PASSWORD=${PG_PASSWORD:-airflow}
       - POSTGRES_HOST=postgres
       - POSTGRES_DB=${PG_DATABASE:-airflow}
+      - POSTGRES_DATABASE=${PG_DATABASE:-airflow}
       - POSTGRES_PORT=${PG_PORT:-5432}
     volumes:
       - db_data:/var/lib/postgresql/data
@@ -225,7 +225,6 @@ services:
         condition: service_healthy
       airflow-init:
         condition: service_completed_successfully       
-
 
   airflow-triggerer:
     <<: *airflow-common
@@ -352,4 +351,3 @@ networks:
 
 volumes:
   db_data:
-
