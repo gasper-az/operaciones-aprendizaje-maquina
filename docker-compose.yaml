@@ -20,9 +20,7 @@
 
 # WARNING: This configuration is for local development. Do not use it in a production deployment.
 x-airflow-common: &airflow-common
-  build:
-    context: .
-    dockerfile: ./dockerfiles/airflow/Dockerfile
+  build: './dockerfiles/airflow'
   image: ${AIRFLOW_IMAGE_NAME:-extending_airflow:latest}
   environment: &airflow-common-env
     AIRFLOW__CORE__EXECUTOR: CeleryExecutor # LocalExecutor
@@ -46,6 +44,7 @@ x-airflow-common: &airflow-common
     #AIRFLOW__API__AUTH_BACKENDS: 'airflow.api.auth.backend.session'
     #AIRFLOW__CORE__TEST_CONNECTION: 'Enabled'
   volumes:
+    - ./data:/opt/data
     - ${AIRFLOW_PROJ_DIR:-./airflow}/dags:/opt/airflow/dags
     - ${AIRFLOW_PROJ_DIR:-./airflow}/logs:/opt/airflow/logs
     - ${AIRFLOW_PROJ_DIR:-./airflow}/config:/opt/airflow/config
@@ -118,7 +117,7 @@ services:
 
   postgres:
     restart: always
-    image: postgres:13
+    image: postgres:17
     container_name: postgres
     ports:
       - "${PG_PORT:-5432}:5432"
@@ -129,6 +128,7 @@ services:
       - POSTGRES_PASSWORD=${PG_PASSWORD:-airflow}
       - POSTGRES_HOST=postgres
       - POSTGRES_DB=${PG_DATABASE:-airflow}
+      - POSTGRES_DATABASE=${PG_DATABASE:-airflow}
       - POSTGRES_PORT=${PG_PORT:-5432}
     volumes:
       - db_data:/var/lib/postgresql/data
@@ -226,7 +226,6 @@ services:
       airflow-init:
         condition: service_completed_successfully       
 
-
   airflow-triggerer:
     <<: *airflow-common
     command: triggerer
@@ -255,7 +254,7 @@ services:
       - bash
       - -c
       - airflow
-
+  
   airflow-init:
     <<: *airflow-common
     entrypoint: /bin/bash
@@ -352,4 +351,3 @@ networks:
 
 volumes:
   db_data:
-
