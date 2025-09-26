@@ -61,15 +61,16 @@ x-airflow-common: &airflow-common
 
 services:
   mlflow:
-    image: ghcr.io/mlflow/mlflow:v2.10.2
+    build: "./dockerfiles/mlflow"
+    image: mlflow
     container_name: mlflow
     command: >
-      sh -c "pip install --no-cache-dir -r /app/requirements.txt &&
-             mlflow server
-             --backend-store-uri postgresql+psycopg2://airflow:airflow@postgres/mlflow_db
-             --default-artifact-root s3://mlflow/
-             --host 0.0.0.0
-             --port 5000"
+      mlflow server
+      --backend-store-uri postgresql://${PG_USER:-airflow}:${PG_PASSWORD:-airflow}@postgres:${PG_PORT:-5432}/mlflow_db
+      --default-artifact-root s3://mlflow/
+      --host 0.0.0.0
+      --port 5000
+      --serve-artifacts
     volumes:
       - ./requirements.txt:/app/requirements.txt:ro
     environment:
