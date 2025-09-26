@@ -43,8 +43,13 @@ Entrega final
 │
 ├── airflow/
 │ ├── dags/ # DAGs de Airflow
-│ │ ├── train_model_dag.py
-│ │ └── batch_predict_dag.py
+│    ├── train_model_dag.py
+│    ├── dag_ingesta.py
+│    ├── dag_entrenamiento.py
+│    ├── dag_evaluacion.py
+│    └── dag_despliegue.py
+│ └── Dockerfile
+
 │ ├── logs/ # Logs (excluidos del repo)
 │ └── plugins/ # Operadores y hooks personalizados
 │
@@ -63,6 +68,10 @@ Entrega final
 ├── dockerfiles/
 │   └── airflow/
 │       └── Dockerfile     
+├── data/
+│   ├── external/
+│   ├── raw/
+│   ├── processed/
 │
 ├── requirements.txt # Dependencias globales del proyecto
 ├── mlflow.sql # Script de inicialización de la DB de MLflow

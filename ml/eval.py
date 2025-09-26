@@ -1,14 +1,11 @@
 # ROD:
-# ES UN TRAIN QUE SOLO ME SIRVE PARA PODER ARMAR EL AIRFLOY Y MLFLOW A SU ALREDEDOR
 # REEMPLAZARLO POR EL DEL MODELO
 
 
 import os
 import pandas as pd
-from sklearn.linear_model import LinearRegression
-from sklearn.model_selection import train_test_split
+from sklearn.metrics import mean_squared_error
 import mlflow
-import mlflow.sklearn
 
 BASE_PATH = "/opt/data"
 PROCESSED_PATH = os.path.join(BASE_PATH, "processed", "bodyfat_clean.csv")
@@ -21,24 +18,22 @@ def main():
     if "BodyFat" not in df.columns:
         raise ValueError("[ERROR] No se encontró la columna 'BodyFat' en el dataset")
 
-    X = df.drop(columns=["BodyFat"])
-    y = df["BodyFat"]
+    # 🚨 Simulación de evaluación
+    y_true = df["BodyFat"].values
+    y_pred = df["BodyFat"].values  # "modelo tonto": predice el mismo valor
 
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+    mse = mean_squared_error(y_true, y_pred)
 
     mlflow.set_tracking_uri("http://mlflow:5000")
     mlflow.set_experiment("bodyfat-experiment")
 
-    model = LinearRegression()
-    with mlflow.start_run(run_name="bodyfat_train"):
-        model.fit(X_train, y_train)
-        mlflow.log_param("model", "LinearRegression")
-        mlflow.sklearn.log_model(model, "model")
-        print("[OK] Modelo entrenado y registrado en MLflow")
+    with mlflow.start_run(run_name="bodyfat_eval"):
+        mlflow.log_metric("mse", mse)
+        print(f"[OK] Evaluación completada. MSE={mse}")
 
 if __name__ == "__main__":
     try:
         main()
     except Exception as e:
-        print(f"[FATAL] Error en train.py: {e}")
+        print(f"[FATAL] Error en eval.py: {e}")
         raise

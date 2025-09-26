@@ -1,3 +1,20 @@
+Airflow http://localhost:8000
+
+MLflow http://localhost:5001
+
+MinIO http://localhost:9101
+
+
+- MLflow a Postgres (postgres:5432) y MinIO (http://minio:9000).
+
+- Airflow a Postgres (postgres:5432) y Redis (redis:6379).
+
+
+ 
+========================
+======== VER 0.0 =======
+========================
+
 Resumen de avances
 =====================
 
@@ -25,3 +42,74 @@ Con esto ya tenemos la infraestructura levantada:
 * MinIO corriendo en localhost:9000 (API) y localhost:9101 (UI Web)
 * MLflow en localhost:5001 (UI Web)
 * Airflow en localhost:8080 (UI Web)
+
+
+
+========================
+======== VER 1.0 =======
+========================
+
+- Airflow levanta
+- MlFlow: saco el pip install de docker compose, para eso creo su propio dockerfile
+
+
+Airflow DAGS
+=================
+** Ingesta de datos
+    Objetivo: orquestar la carga de datos crudos hacia una base intermedia o un bucket en MinIO.
+    Simula la llegada de datos nuevos (ej. registros, features). Es el primer paso de un pipeline ML.
+
+    Tareas:
+    - Leer dataset (CSV o SQL).
+    - Guardar copia en MinIO (s3://mlflow/data).
+    - Notificar que los datos están listos.
+
+** Preprocesamiento / features
+    Objetivo: aplicar transformaciones simples sobre los datos (limpieza, normalización, splits train/test).
+    En cualquier flujo ML, los datos crudos no van directo al modelo.
+
+    Tareas:
+    - Cargar datos desde MinIO/Postgres.
+    - Hacer limpieza básica (ej. drop NaN, codificación).
+    -Guardar dataset procesado en MinIO.
+
+** Entrenamiento de modelo
+    Objetivo: entrenar un modelo ML y registrarlo en MLflow.
+    Es el corazón del proyecto, muestra la integración Airflow → MLflow.
+
+    Tareas:
+    - Descargar dataset procesado.
+    - Entrenar modelo (ej. LogisticRegression o RandomForest).
+    - Guardar métricas y parámetros en MLflow Tracking.
+    - Registrar el modelo en el Model Registry de MLflow.
+
+** Evaluación del modelo
+    Objetivo: validar la performance de un modelo entrenado.
+    Permite comparar versiones del modelo, condición típica en MLOps.
+
+    Tareas:
+    - Cargar modelo de MLflow.Evaluar en test set.
+    - Guardar métricas en MLflow (accuracy, f1, etc.).
+    - (Opcional) decidir si el modelo “pasa a producción”.
+
+** Despliegue simulado
+    Objetivo: simular un despliegue en producción.
+    Mostrar cómo un modelo aprobado se expone como API (aunque sea dummy).
+
+    Tareas:
+    - Descargar modelo “aprobado” desde MLflow Registry.
+    - Guardarlo en MinIO en carpeta production/.
+    - (Opcional) lanzar un contenedor con FastAPI que sirva predicciones.
+
+
+OBS Airflow:
+- Si no muestra el DAG como corresponde, eliminar esta carpeta:
+  \operaciones-aprendizaje-maquina\airflow\dags\__pycache__
+  luego correr: docker compose restart airflow-apiserver airflow-scheduler
+
+
+  ML
+  =====
+  Dentro de esta carpeta deberia estar nuestro modelo.
+  Cree archivos dummy solo para las pruebas de Airflow
+  Por el amor de STEVE JOBS , poner un modelo nuestro, sencillo pero nuestro.
