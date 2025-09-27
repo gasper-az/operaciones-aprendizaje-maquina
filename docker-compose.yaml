@@ -42,6 +42,7 @@ x-airflow-common: &airflow-common
     AWS_SECRET_ACCESS_KEY: ${MINIO_SECRET_ACCESS_KEY:-minio123}
     AWS_ENDPOINT_URL_S3: http://s3:9000
     MLFLOW_S3_ENDPOINT_URL: http://s3:9000
+    # AIRFLOW__API__WORKERS: '1' # https://github.com/apache/airflow/issues/52270
     #AIRFLOW__API__AUTH_BACKENDS: 'airflow.api.auth.backend.session'
     #AIRFLOW__CORE__TEST_CONNECTION: 'Enabled'
   volumes:
@@ -51,6 +52,7 @@ x-airflow-common: &airflow-common
     - ${AIRFLOW_PROJ_DIR:-./airflow}/config:/opt/airflow/config
     - ${AIRFLOW_PROJ_DIR:-./airflow}/plugins:/opt/airflow/plugins
     - ${AIRFLOW_PROJ_DIR:-./airflow}/secrets:/opt/secrets
+    - ./utilities/scripts:/opt/utilities/scripts # Referenciamos directamente a la carpeta con scripts
   networks:
     - backend
   user: "${AIRFLOW_UID:-50000}:${AIRFLOW_GID:-0}"
@@ -168,6 +170,8 @@ services:
   airflow-apiserver:
     <<: *airflow-common
     command: api-server
+    environment:
+      AIRFLOW__API__WORKERS: '1'
     ports:
       - "${AIRFLOW_PORT:-8080}:8080"
     healthcheck:
