@@ -22,9 +22,8 @@ El objetivo es desplegar y orquestar un pipeline de MLOps con los siguientes ser
 
 ### Entrega 1
 
-- Notebook + train.py loggeando en MLflow.
+- Notebook loggeando en MLflow.
 - DAG de entrenamiento básico corriendo.
-- API /health y /predict sirviendo un modelo fijo.
 - README inicial.
 
 ### Entrega final
@@ -34,7 +33,7 @@ El objetivo es desplegar y orquestar un pipeline de MLOps con los siguientes ser
 - API usando modelo en Production.
 - Documentación + tests básicos.
 
-## 📂 Estructura de carpetas
+### 📂 Estructura de carpetas
 
 ```YAML
 ├── notebooks/ # Exploración y prototipado de modelos
@@ -74,3 +73,33 @@ El objetivo es desplegar y orquestar un pipeline de MLOps con los siguientes ser
 ├── docker-compose.yaml # Orquestación de servicios
 └── README.md # Documentación del proyecto
 ```
+
+### Comandos útiles
+
+***Requerimientos***
+
+- *Docker* o *docker desktop* instalados
+
+***Comandos***
+
+- Para correr el proyecto:
+  - `cd ./OPERACIONES-APRENDIZAJE-MAQUINA`.
+  - `docker compose up`.
+  - Opcionalmente `docker compose -f docker-compose.yaml up` para espeficiar el archivo compose.
+- Para hacer build luego de actualizar imágenes y/o `docker-compose.yaml`:
+  - `cd ./OPERACIONES-APRENDIZAJE-MAQUINA`.
+  - `docker compose build`.
+- Para hacer build y ejecutar nuevas imágenes:
+  - `cd ./OPERACIONES-APRENDIZAJE-MAQUINA`.
+  - `docker compose up --build`
+- Para borrar los containers:
+  - `cd ./OPERACIONES-APRENDIZAJE-MAQUINA`.
+  - `docker compose down`.
+  - Opcionalmente `docker compose down -v` para borrar los ***volúmenes*** creados.
+- ***Recomendación***
+  - Si se realizaron varios cambios en los dockerfiles y al hacer `docker compose up --build` estos no se detectan, eliminar containers, volúmenes e imágenes (fuerza bruta).
+  - `docker compose down -v` para eliminar containers y volúmenes.
+  - En docker desktop, ir a imágenes y seleccionar aquellas que se desean borrar.
+  - Luego, volver a ejecutar `docker compose up`.
+  - ***TODO***: buscar como eliminar imágenes mediante *cli*.
+  - ***TODO***: buscar comando para levantar todo nuevamente (rebuild?).

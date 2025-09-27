@@ -3,6 +3,21 @@ import pandas as pd
 from scipy import stats
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import MinMaxScaler, StandardScaler
+from typing import Tuple
+
+def descargar_y_guardar_dataframe(url: str, path: str, index: bool = False):
+    """
+    Descarga un dataframe de una URL, y lo guarda en un path de filesystem.
+
+    Args:
+        url (str): URL de donde se descarga el dataframe.
+        path (str): PATH en donde se guarda el csv.
+        index (bool): indica si en el archivo final se deben guardar los
+            índices. Default a False.
+    """
+    dataframe = pd.read_csv(url)
+
+    dataframe.to_csv(path_or_buf=path, index=index)
 
 def split_dataframe_train_test(dataframe: pd.DataFrame, target: str, random_state: int, test_size:float = 0.3) -> tuple:
     """
@@ -249,3 +264,56 @@ def procesar_dataframe_completo(dataframe: pd.DataFrame, target: str, random_sta
                      scaler="StandardScaler", columnas=cols_a_escalar)
 
     return X_train, X_test, y_train, y_test
+
+def separar_columna_dataset(dataset: pd.DataFrame, columna: str) -> Tuple[pd.DataFrame, pd.Series]:
+    """
+    Separa una columna de un dataset.
+
+    Args:
+        dataset (pd.DataFrame): Dataser sobre el cual trabajar.
+        columna (str): Nombre de la columna a separar.
+    Returns:
+        Tuple: pd.DataFrame, pd.Series.
+    """
+    col_data = dataset[columna]
+    dataset = dataset.drop(columns=[columna])
+
+    return dataset, col_data
+
+def cargar_train_test_from_files(train_path: str, test_path: str, target: str) -> Tuple[pd.DataFrame, pd.DataFrame, pd.Series, pd.Series]:
+    """
+    Lee archivos correspondientes a dataframes de train y test.
+
+    Args:
+        train_path (str): Path al dataset de train.
+        test_path (str): Path al dataset de test.
+        target (str): Columna correspondiente al target.
+    Returns:
+        Tuple: X_train, X_test, y_train, y_test.
+    """
+    train = pd.read_csv(train_path)
+    test = pd.read_csv(test_path)
+
+    X_train, y_train = separar_columna_dataset(dataset=train, columna=target)
+    X_test, y_test = separar_columna_dataset(dataset=test, columna=target)
+
+    return X_train, X_test, y_train, y_test
+
+def guardar_train_test(X_train: pd.DataFrame, X_test: pd.DataFrame, y_train: pd.Series, y_test: pd.Series, train_path: str, test_path: str, index: bool = False):
+    """
+    Guarda los datos de X_train, X_test, y_train e y_test en dos archivos distintos.
+
+    Args:
+        X_train (pd.DataFrame): Features de train.
+        X_test (pd.DataFrame): Features de test.
+        y_train (pd.Series): Objetivo de train.
+        y_test (pd.Series): Objetivo de test.
+        train_path (str): Archivo donde se guarda el train.
+        test_path (str): Archivo donde se guarda el test.
+        index (bool): Indica si los archivos finales incluyen índixes. Default a False.
+    """
+    train = X_train.join(y_train)
+    test = X_test.join(y_test)
+
+    train.to_csv(train_path, index=index)
+    test.to_csv(test_path, index=index)    
