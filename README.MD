@@ -36,6 +36,7 @@ El objetivo es desplegar y orquestar un pipeline de MLOps con los siguientes ser
 
 ## 📂 Estructura de carpetas
 
+```YAML
 ├── notebooks/ # Exploración y prototipado de modelos
 │ └── body_fat_analysis.ipynb
 │
@@ -72,3 +73,4 @@ El objetivo es desplegar y orquestar un pipeline de MLOps con los siguientes ser
 ├── mlflow.sql # Script de inicialización de la DB de MLflow
 ├── docker-compose.yaml # Orquestación de servicios
 └── README.md # Documentación del proyecto
+```

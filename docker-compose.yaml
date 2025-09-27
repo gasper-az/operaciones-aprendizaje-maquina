@@ -41,6 +41,7 @@ x-airflow-common: &airflow-common
     AWS_ACCESS_KEY_ID: ${MINIO_ACCESS_KEY:-minio}
     AWS_SECRET_ACCESS_KEY: ${MINIO_SECRET_ACCESS_KEY:-minio123}
     AWS_ENDPOINT_URL_S3: http://s3:9000
+    MLFLOW_S3_ENDPOINT_URL: http://s3:9000
     #AIRFLOW__API__AUTH_BACKENDS: 'airflow.api.auth.backend.session'
     #AIRFLOW__CORE__TEST_CONNECTION: 'Enabled'
   volumes:
@@ -67,16 +68,16 @@ services:
     command: >
       mlflow server
       --backend-store-uri postgresql://${PG_USER:-airflow}:${PG_PASSWORD:-airflow}@postgres:${PG_PORT:-5432}/mlflow_db
-      --default-artifact-root s3://mlflow/
+      --default-artifact-root s3://${MLFLOW_BUCKET_NAME:-mlflow}/
       --host 0.0.0.0
       --port 5000
       --serve-artifacts
     volumes:
       - ./requirements.txt:/app/requirements.txt:ro
     environment:
-      MLFLOW_S3_ENDPOINT_URL: http://minio:9000
-      AWS_ACCESS_KEY_ID: minio
-      AWS_SECRET_ACCESS_KEY: minio123
+      - AWS_ACCESS_KEY_ID=${MINIO_ACCESS_KEY:-minio}
+      - AWS_SECRET_ACCESS_KEY=${MINIO_SECRET_ACCESS_KEY:-minio123}
+      - MLFLOW_S3_ENDPOINT_URL=http://s3:9000
     ports:
       - "5001:5000"
     depends_on:
@@ -90,50 +91,60 @@ services:
   minio:
     image: minio/minio:latest
     container_name: minio
-    command: server /data --console-address ":9001"
+    command: server /data --console-address :9001
     environment:
-      MINIO_ROOT_USER: minio
-      MINIO_ROOT_PASSWORD: minio123
+      - MINIO_ROOT_USER=${MINIO_ACCESS_KEY:-minio}
+      - MINIO_ROOT_PASSWORD=${MINIO_SECRET_ACCESS_KEY:-minio123}
     ports:
-      - "9000:9000"
-      - "9101:9001"
+      - "${MINIO_PORT:-9000}:9000"
+      - "${MINIO_PORT_UI:-9001}:9001"
     volumes:
       - ./minio_data:/data
     networks:
       - backend
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 60s
+      timeout: 20s
+      retries: 3      
 
   createbuckets:
     image: minio/mc:latest
     depends_on:
       - minio
     entrypoint: >
-      /bin/sh -c "
-      sleep 5 &&
-      mc alias set local http://minio:9000 minio minio123 &&
-      mc mb -p local/mlflow || true &&
-      exit 0
-      "
+      /bin/sh -c '
+      sleep 5;
+      /usr/bin/mc alias set s3 http://s3:9000 ${MINIO_ACCESS_KEY:-minio} ${MINIO_SECRET_ACCESS_KEY:-minio123};
+      /usr/bin/mc mb s3/${MLFLOW_BUCKET_NAME:-mlflow};
+      /usr/bin/mc mb s3/${DATA_REPO_BUCKET_NAME:-data};
+      exit 0;
+      '      
     networks:
       - backend
 
   postgres:
     restart: always
-    image: postgres:17
+    build: "./dockerfiles/postgres"
+    image: postgres-build
     container_name: postgres
+    # profiles:
+    #   - airflow
+    #   - mlflow
+    #   - all
     ports:
       - "${PG_PORT:-5432}:5432"
     networks:
       - backend
     environment:
-      - POSTGRES_USER=${PG_USER:-airflow}
-      - POSTGRES_PASSWORD=${PG_PASSWORD:-airflow}
       - POSTGRES_HOST=postgres
       - POSTGRES_DB=${PG_DATABASE:-airflow}
+      - POSTGRES_USER=${PG_USER:-airflow}
+      - POSTGRES_PASSWORD=${PG_PASSWORD:-airflow}
       - POSTGRES_DATABASE=${PG_DATABASE:-airflow}
       - POSTGRES_PORT=${PG_PORT:-5432}
     volumes:
       - db_data:/var/lib/postgresql/data
-      - ./utilities/scripts/mlflow.sql:/docker-entrypoint-initdb.d/mlflow.sql   # 👈 agrega tu script
     healthcheck:
       test: ["CMD", "pg_isready", "-p", "5432", "-U", "${PG_USER:-airflow}"]
       interval: 60s
