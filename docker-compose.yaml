@@ -41,8 +41,8 @@ x-airflow-common: &airflow-common
     AWS_ACCESS_KEY_ID: ${MINIO_ACCESS_KEY:-minio}
     AWS_SECRET_ACCESS_KEY: ${MINIO_SECRET_ACCESS_KEY:-minio123}
     AWS_ENDPOINT_URL_S3: http://s3:9000
-    MLFLOW_S3_ENDPOINT_URL: http://s3:9000
-    # AIRFLOW__API__WORKERS: '1' # https://github.com/apache/airflow/issues/52270
+    MLFLOW_S3_ENDPOINT_URL: http://minio:9000
+    AIRFLOW__API__WORKERS: '1' # https://github.com/apache/airflow/issues/52270
     #AIRFLOW__API__AUTH_BACKENDS: 'airflow.api.auth.backend.session'
     #AIRFLOW__CORE__TEST_CONNECTION: 'Enabled'
   volumes:
@@ -52,7 +52,9 @@ x-airflow-common: &airflow-common
     - ${AIRFLOW_PROJ_DIR:-./airflow}/config:/opt/airflow/config
     - ${AIRFLOW_PROJ_DIR:-./airflow}/plugins:/opt/airflow/plugins
     - ${AIRFLOW_PROJ_DIR:-./airflow}/secrets:/opt/secrets
-    - ./utilities/scripts:/opt/utilities/scripts # Referenciamos directamente a la carpeta con scripts
+    - ./utilities/scripts:/opt/airflow/dags/utilities/scripts
+    # - ./utilities:/opt/data # Referenciamos directamente a la carpeta con scripts
+    # - ./utilities/scripts:utilities/scripts # Referenciamos directamente a la carpeta con scripts
   networks:
     - backend
   user: "${AIRFLOW_UID:-50000}:${AIRFLOW_GID:-0}"
@@ -79,7 +81,7 @@ services:
     environment:
       - AWS_ACCESS_KEY_ID=${MINIO_ACCESS_KEY:-minio}
       - AWS_SECRET_ACCESS_KEY=${MINIO_SECRET_ACCESS_KEY:-minio123}
-      - MLFLOW_S3_ENDPOINT_URL=http://s3:9000
+      - MLFLOW_S3_ENDPOINT_URL=http://minio:9000
     ports:
       - "5001:5000"
     depends_on:
@@ -104,24 +106,26 @@ services:
       - ./minio_data:/data
     networks:
       - backend
-    healthcheck:
-      test: ["CMD", "mc", "ready", "local"]
-      interval: 60s
-      timeout: 20s
-      retries: 3      
 
   createbuckets:
     image: minio/mc:latest
     depends_on:
       - minio
+    # entrypoint: >
+    #   /bin/sh -c '
+    #   sleep 5;
+    #   /usr/bin/mc alias set s3 http://minio:9000 ${MINIO_ACCESS_KEY:-minio} ${MINIO_SECRET_ACCESS_KEY:-minio123};
+    #   /usr/bin/mc mb s3/${MLFLOW_BUCKET_NAME:-mlflow};
+    #   /usr/bin/mc mb s3/${DATA_REPO_BUCKET_NAME:-data};
+    #   exit 0;
+    #   '
     entrypoint: >
-      /bin/sh -c '
-      sleep 5;
-      /usr/bin/mc alias set s3 http://s3:9000 ${MINIO_ACCESS_KEY:-minio} ${MINIO_SECRET_ACCESS_KEY:-minio123};
-      /usr/bin/mc mb s3/${MLFLOW_BUCKET_NAME:-mlflow};
-      /usr/bin/mc mb s3/${DATA_REPO_BUCKET_NAME:-data};
-      exit 0;
-      '      
+      /bin/sh -c 
+      sleep 5 &&
+      mc alias set local http://minio:9000 ${MINIO_ACCESS_KEY:-minio} ${MINIO_SECRET_ACCESS_KEY:-minio123} &&
+      mc mb -p local/mlflow && mc mb -p local/data || true &&
+      exit 0
+      '
     networks:
       - backend
 
@@ -170,8 +174,6 @@ services:
   airflow-apiserver:
     <<: *airflow-common
     command: api-server
-    environment:
-      AIRFLOW__API__WORKERS: '1'
     ports:
       - "${AIRFLOW_PORT:-8080}:8080"
     healthcheck:

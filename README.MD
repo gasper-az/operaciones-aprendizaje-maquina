@@ -92,14 +92,28 @@ El objetivo es desplegar y orquestar un pipeline de MLOps con los siguientes ser
 - Para hacer build y ejecutar nuevas imágenes:
   - `cd ./OPERACIONES-APRENDIZAJE-MAQUINA`.
   - `docker compose up --build`
+- Para hacer build y forzar la recreación de containers:
+  - `docker compose up --build --force-recreate`
 - Para borrar los containers:
   - `cd ./OPERACIONES-APRENDIZAJE-MAQUINA`.
   - `docker compose down`.
   - Opcionalmente `docker compose down -v` para borrar los ***volúmenes*** creados.
-- ***Recomendación***
-  - Si se realizaron varios cambios en los dockerfiles y al hacer `docker compose up --build` estos no se detectan, eliminar containers, volúmenes e imágenes (fuerza bruta).
-  - `docker compose down -v` para eliminar containers y volúmenes.
-  - En docker desktop, ir a imágenes y seleccionar aquellas que se desean borrar.
-  - Luego, volver a ejecutar `docker compose up`.
-  - ***TODO***: buscar como eliminar imágenes mediante *cli*.
-  - ***TODO***: buscar comando para levantar todo nuevamente (rebuild?).
+- Para hacer un *clean build*:
+  - `cd ./OPERACIONES-APRENDIZAJE-MAQUINA`.
+  - `docker compose build --no-cache`
+  - `docker compose up --force-recreate`
+- ***Hints***
+  - Ejecutar `docker compose up --force-recreate` para forzar la recreación de imágenes y containers.
+    - Ideal para cuando se están probando configuraciones nuevas, pero los updates *no se reflejan*.
+    - Puede demorar un poco más de tiempo de lo habitual.
+  - Si no se notan updates luego del comando anterior, probar con hacer un *clean build*.
+    - Esto demora incluso mucho más tiempo, ya que tiene que descargar las imágenes nuevamente.
+  - Eventualmente se pueden borrar las imágenes que no se vieron afectadas por el update.
+    - Desde docker desktop, primero eliminar los containers, luego las imágenes y volúmenes.
+    - Alternativa: ver respuestas en este [post de Stack Overflow](https://stackoverflow.com/questions/44785585/how-can-i-delete-all-local-docker-images).
+- ***Recomendación*** - Recrear ambiente local
+  - `docker compose down -v`
+  - Borrar las siguientes carpetas
+    - `/airflow/dags/__pycache__`
+    - `/minio_data`
+  - `docker compose up --build`
