@@ -1,7 +1,0 @@
-FROM ghcr.io/mlflow/mlflow:v2.10.2
-
-# Copiamos el requirements.txt de tu proyecto
-COPY requirements.txt /app/requirements.txt
-
-# Instalamos dependencias adicionales solo una vez en el build
-RUN pip install --no-cache-dir -r /app/requirements.txt
