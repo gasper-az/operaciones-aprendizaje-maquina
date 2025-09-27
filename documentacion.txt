@@ -1,115 +1,365 @@
-Airflow http://localhost:8000
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+#
+# Modified by Facundo Lucianna on July 12, 2025, based on the 
+# original file from the ASF.
 
-MLflow http://localhost:5001
+# WARNING: This configuration is for local development. Do not use it in a production deployment.
+x-airflow-common: &airflow-common
+  build: './dockerfiles/airflow'
+  image: ${AIRFLOW_IMAGE_NAME:-extending_airflow:latest}
+  environment: &airflow-common-env
+    AIRFLOW__CORE__EXECUTOR: CeleryExecutor # LocalExecutor
+    AIRFLOW__CORE__AUTH_MANAGER: airflow.providers.fab.auth_manager.fab_auth_manager.FabAuthManager
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${PG_USER:-airflow}:${PG_PASSWORD:-airflow}@postgres/${PG_DATABASE:-airflow}
+    AIRFLOW__CELERY__RESULT_BACKEND: db+postgresql://${PG_USER:-airflow}:${PG_PASSWORD:-airflow}@postgres/${PG_DATABASE:-airflow}
+    AIRFLOW__CELERY__BROKER_URL: redis://:@redis:6379/0
+    AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${PG_USER:-airflow}:${PG_PASSWORD:-airflow}@postgres/${PG_DATABASE:-airflow}
+    AIRFLOW__CORE__FERNET_KEY: ''
+    AIRFLOW__API_AUTH__JWT_SECRET: 'qt2Edq6LIRdv5k0DDznVOA=='
+    AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'true'
+    AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
+    AIRFLOW__CORE__EXECUTION_API_SERVER_URL: 'http://airflow-apiserver:8080/execution/'
+    AIRFLOW__SCHEDULER__ENABLE_HEALTH_CHECK: 'true'
+    AIRFLOW__WEBSERVER__EXPOSE_CONFIG: 'True'
+    AIRFLOW__SECRETS__BACKEND: airflow.secrets.local_filesystem.LocalFilesystemBackend
+    AIRFLOW__SECRETS__BACKEND_KWARGS: '{"variables_file_path": "/opt/secrets/variables.yaml", "connections_file_path": "/opt/secrets/connections.yaml"}'
+    AWS_ACCESS_KEY_ID: ${MINIO_ACCESS_KEY:-minio}
+    AWS_SECRET_ACCESS_KEY: ${MINIO_SECRET_ACCESS_KEY:-minio123}
+    AWS_ENDPOINT_URL_S3: http://s3:9000
+    MLFLOW_S3_ENDPOINT_URL: http://s3:9000
+    #AIRFLOW__API__AUTH_BACKENDS: 'airflow.api.auth.backend.session'
+    #AIRFLOW__CORE__TEST_CONNECTION: 'Enabled'
+  volumes:
+    - ./data:/opt/data
+    - ${AIRFLOW_PROJ_DIR:-./airflow}/dags:/opt/airflow/dags
+    - ${AIRFLOW_PROJ_DIR:-./airflow}/logs:/opt/airflow/logs
+    - ${AIRFLOW_PROJ_DIR:-./airflow}/config:/opt/airflow/config
+    - ${AIRFLOW_PROJ_DIR:-./airflow}/plugins:/opt/airflow/plugins
+    - ${AIRFLOW_PROJ_DIR:-./airflow}/secrets:/opt/secrets
+  networks:
+    - backend
+  user: "${AIRFLOW_UID:-50000}:${AIRFLOW_GID:-0}"
+  depends_on:  &airflow-common-depends-on
+    postgres:
+      condition: service_healthy
+    redis:
+      condition: service_healthy
 
-MinIO http://localhost:9101
+services:
+  mlflow:
+    build: "./dockerfiles/mlflow"
+    image: mlflow
+    container_name: mlflow
+    command: >
+      mlflow server
+      --backend-store-uri postgresql://${PG_USER:-airflow}:${PG_PASSWORD:-airflow}@postgres:${PG_PORT:-5432}/mlflow_db
+      --default-artifact-root s3://${MLFLOW_BUCKET_NAME:-mlflow}/
+      --host 0.0.0.0
+      --port 5000
+      --serve-artifacts
+    volumes:
+      - ./requirements.txt:/app/requirements.txt:ro
+    environment:
+      - AWS_ACCESS_KEY_ID=${MINIO_ACCESS_KEY:-minio}
+      - AWS_SECRET_ACCESS_KEY=${MINIO_SECRET_ACCESS_KEY:-minio123}
+      - MLFLOW_S3_ENDPOINT_URL=http://s3:9000
+    ports:
+      - "5001:5000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_started
+    networks:
+      - backend
 
+  minio:
+    image: minio/minio:latest
+    container_name: minio
+    command: server /data --console-address :9001
+    environment:
+      - MINIO_ROOT_USER=${MINIO_ACCESS_KEY:-minio}
+      - MINIO_ROOT_PASSWORD=${MINIO_SECRET_ACCESS_KEY:-minio123}
+    ports:
+      - "${MINIO_PORT:-9000}:9000"
+      - "${MINIO_PORT_UI:-9001}:9001"
+    volumes:
+      - ./minio_data:/data
+    networks:
+      - backend
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 60s
+      timeout: 20s
+      retries: 3      
 
-- MLflow a Postgres (postgres:5432) y MinIO (http://minio:9000).
+  createbuckets:
+    image: minio/mc:latest
+    depends_on:
+      - minio
+    entrypoint: >
+      /bin/sh -c '
+      sleep 5;
+      /usr/bin/mc alias set s3 http://s3:9000 ${MINIO_ACCESS_KEY:-minio} ${MINIO_SECRET_ACCESS_KEY:-minio123};
+      /usr/bin/mc mb s3/${MLFLOW_BUCKET_NAME:-mlflow};
+      /usr/bin/mc mb s3/${DATA_REPO_BUCKET_NAME:-data};
+      exit 0;
+      '      
+    networks:
+      - backend
 
-- Airflow a Postgres (postgres:5432) y Redis (redis:6379).
+  postgres:
+    restart: always
+    build: "./dockerfiles/postgres"
+    image: postgres-build
+    container_name: postgres
+    # profiles:
+    #   - airflow
+    #   - mlflow
+    #   - all
+    ports:
+      - "${PG_PORT:-5432}:5432"
+    networks:
+      - backend
+    environment:
+      - POSTGRES_HOST=postgres
+      - POSTGRES_DB=${PG_DATABASE:-airflow}
+      - POSTGRES_USER=${PG_USER:-airflow}
+      - POSTGRES_PASSWORD=${PG_PASSWORD:-airflow}
+      - POSTGRES_DATABASE=${PG_DATABASE:-airflow}
+      - POSTGRES_PORT=${PG_PORT:-5432}
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-p", "5432", "-U", "${PG_USER:-airflow}"]
+      interval: 60s
+      timeout: 20s
+      retries: 3
 
+  redis:
+    image: valkey/valkey:8.1-bookworm
+    expose:
+      - 6379
+    networks:
+      - backend
+    healthcheck:
+      test: ["CMD", "valkey-cli", "ping"]
+      interval: 10s
+      timeout: 30s
+      retries: 50
+      start_period: 30s
+    restart: always
 
- 
-========================
-======== VER 0.0 =======
-========================
+  airflow-apiserver:
+    <<: *airflow-common
+    command: api-server
+    ports:
+      - "${AIRFLOW_PORT:-8080}:8080"
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8080/api/v2/version"]
+      interval: 60s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    restart: always
+    depends_on:
+      <<: *airflow-common-depends-on
+      airflow-init:
+        condition: service_completed_successfully
 
-Resumen de avances
-=====================
+  airflow-scheduler:
+    <<: *airflow-common
+    command: scheduler
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8974/health"]
+      # test: [ "CMD-SHELL", 'airflow jobs check --job-type SchedulerJob --hostname "$${HOSTNAME}"' ]
+      interval: 60s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    restart: always
+    depends_on:
+      <<: *airflow-common-depends-on
+      airflow-init:
+        condition: service_completed_successfully
 
-** Estructura del proyecto
-- Armamos carpetas: notebooks/, dockerfiles/, utilities/scripts/, etc.
-- Creamos requirements.txt con librerías necesarias (mlflow, boto3, psycopg2-binary, etc.).
+  airflow-dag-processor:
+    <<: *airflow-common
+    command: dag-processor
+    healthcheck:
+      test: ["CMD-SHELL", 'airflow jobs check --job-type DagProcessorJob --hostname "$${HOSTNAME}"']
+      interval: 60s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    restart: always
+    depends_on:
+      <<: *airflow-common-depends-on
+      airflow-init:
+        condition: service_completed_successfully
 
-**Docker Compose
-- Configuramos un docker-compose.yaml que levanta los servicios:
-  - Postgres → base de datos para Airflow y MLflow.
-  - Redis (Valkey) → backend de mensajes para Airflow.
-  - MinIO → almacenamiento S3 local para los artefactos de MLflow.
-  - MLflow → servidor de experimentos, conectado a Postgres y MinIO.
-  - Airflow (scheduler, worker, webserver) → orquestación de flujos de datos y entrenamientos.
+  airflow-worker:
+    <<: *airflow-common
+    command: celery worker
+    healthcheck:
+      # yamllint disable rule:line-length
+      test:
+        - "CMD-SHELL"
+        - 'celery --app airflow.providers.celery.executors.celery_executor.app inspect ping -d "celery@$${HOSTNAME}" || celery --app airflow.executors.celery_executor.app inspect ping -d "celery@$${HOSTNAME}"'
+      interval: 60s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    environment:
+      <<: *airflow-common-env
+      # Required to handle warm shutdown of the celery workers properly
+      # See https://airflow.apache.org/docs/docker-stack/entrypoint.html#signal-propagation
+      DUMB_INIT_SETSID: "0"
+    restart: always
+    depends_on:
+      <<: *airflow-common-depends-on
+      airflow-apiserver:
+        condition: service_healthy
+      airflow-init:
+        condition: service_completed_successfully       
 
-** Configuraciones extra
-- Variables de entorno (.env) para MLflow y MinIO.
-- Script mlflow.sql montado en Postgres para crear la DB mlflow_db.
-- Montaje de requirements.txt en el contenedor MLflow para instalar dependencias faltantes.
-- Ajuste de command en el servicio MLflow para que efectivamente levante el servidor web en el puerto 5001.
+  airflow-triggerer:
+    <<: *airflow-common
+    command: triggerer
+    healthcheck:
+      test: ["CMD-SHELL", 'airflow jobs check --job-type TriggererJob --hostname "$${HOSTNAME}"']
+      interval: 60s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    restart: always
+    depends_on:
+      <<: *airflow-common-depends-on
+      airflow-init:
+        condition: service_completed_successfully
 
-Con esto ya tenemos la infraestructura levantada:
-=====================================================
-* Postgres corriendo en localhost:5432
-* MinIO corriendo en localhost:9000 (API) y localhost:9101 (UI Web)
-* MLflow en localhost:5001 (UI Web)
-* Airflow en localhost:8080 (UI Web)
+  airflow-cli:
+    <<: *airflow-common
+    container_name: airflow_cli
+    profiles:
+      - debug
+    environment:
+      <<: *airflow-common-env
+      CONNECTION_CHECK_MAX_COUNT: "0"
+    # Workaround for entrypoint issue. See: https://github.com/apache/airflow/issues/16252
+    command:
+      - bash
+      - -c
+      - airflow
+  
+  airflow-init:
+    <<: *airflow-common
+    entrypoint: /bin/bash
+    # yamllint disable rule:line-length
+    command:
+      - -c
+      - |
+        if [[ -z "${AIRFLOW_UID:-50000}" ]]; then
+          echo
+          echo -e "\033[1;33mWARNING!!!: AIRFLOW_UID not set!\e[0m"
+          echo "If you are on Linux, you SHOULD follow the instructions below to set "
+          echo "AIRFLOW_UID environment variable, otherwise files will be owned by root."
+          echo "For other operating systems you can get rid of the warning with manually created .env file:"
+          echo "    See: https://airflow.apache.org/docs/apache-airflow/stable/howto/docker-compose/index.html#setting-the-right-airflow-user"
+          echo
+        fi
+        one_meg=1048576
+        mem_available=$$(($$(getconf _PHYS_PAGES) * $$(getconf PAGE_SIZE) / one_meg))
+        cpus_available=$$(grep -cE 'cpu[0-9]+' /proc/stat)
+        disk_available=$$(df / | tail -1 | awk '{print $$4}')
+        warning_resources="false"
+        if (( mem_available < 4000 )) ; then
+          echo
+          echo -e "\033[1;33mWARNING!!!: Not enough memory available for Docker.\e[0m"
+          echo "At least 4GB of memory required. You have $$(numfmt --to iec $$((mem_available * one_meg)))"
+          echo
+          warning_resources="true"
+        fi
+        if (( cpus_available < 2 )); then
+          echo
+          echo -e "\033[1;33mWARNING!!!: Not enough CPUS available for Docker.\e[0m"
+          echo "At least 2 CPUs recommended. You have $${cpus_available}"
+          echo
+          warning_resources="true"
+        fi
+        if (( disk_available < one_meg * 10 )); then
+          echo
+          echo -e "\033[1;33mWARNING!!!: Not enough Disk space available for Docker.\e[0m"
+          echo "At least 10 GBs recommended. You have $$(numfmt --to iec $$((disk_available * 1024 )))"
+          echo
+          warning_resources="true"
+        fi
+        if [[ $${warning_resources} == "true" ]]; then
+          echo
+          echo -e "\033[1;33mWARNING!!!: You have not enough resources to run Airflow (see above)!\e[0m"
+          echo "Please follow the instructions to increase amount of resources available:"
+          echo "   https://airflow.apache.org/docs/apache-airflow/stable/howto/docker-compose/index.html#before-you-begin"
+          echo
+        fi
+        echo
+        echo "Creating missing opt dirs if missing:"
+        echo
+        mkdir -v -p /opt/airflow/{logs,dags,plugins,config}
+        echo
+        echo "Airflow version:"
+        /entrypoint airflow version
+        echo
+        echo "Files in shared volumes:"
+        echo
+        ls -la /opt/airflow/{logs,dags,plugins,config}
+        echo
+        echo "Running airflow config list to create default config file if missing."
+        echo
+        /entrypoint airflow config list >/dev/null
+        echo
+        echo "Files in shared volumes:"
+        echo
+        ls -la /opt/airflow/{logs,dags,plugins,config}
+        echo
+        echo "Change ownership of files in /opt/airflow to ${AIRFLOW_UID}:${AIRFLOW_GID:-0}"
+        echo
+        chown -R "${AIRFLOW_UID:-50000}:${AIRFLOW_GID:-0}" /opt/airflow/
+        echo
+        echo "Change ownership of files in shared volumes to ${AIRFLOW_UID}:${AIRFLOW_GID:-0}"
+        echo
+        chown -v -R "${AIRFLOW_UID}:${AIRFLOW_GID:-0}" /opt/airflow/{logs,dags,plugins,config}
+        echo
+        echo "Files in shared volumes:"
+        echo
+        ls -la /opt/airflow/{logs,dags,plugins,config}
+    # yamllint enable rule:line-length
+    environment:
+      <<: *airflow-common-env
+      _AIRFLOW_DB_MIGRATE: 'true'
+      _AIRFLOW_WWW_USER_CREATE: 'true'
+      _AIRFLOW_WWW_USER_USERNAME: ${_AIRFLOW_WWW_USER_USERNAME:-airflow}
+      _AIRFLOW_WWW_USER_PASSWORD: ${_AIRFLOW_WWW_USER_PASSWORD:-airflow}
+      _PIP_ADDITIONAL_REQUIREMENTS: ''
+    user: "0:0"
 
+networks:
+  backend:
+    driver: bridge
 
-
-========================
-======== VER 1.0 =======
-========================
-
-- Airflow levanta
-- MlFlow: saco el pip install de docker compose, para eso creo su propio dockerfile
-
-
-Airflow DAGS
-=================
-** Ingesta de datos
-    Objetivo: orquestar la carga de datos crudos hacia una base intermedia o un bucket en MinIO.
-    Simula la llegada de datos nuevos (ej. registros, features). Es el primer paso de un pipeline ML.
-
-    Tareas:
-    - Leer dataset (CSV o SQL).
-    - Guardar copia en MinIO (s3://mlflow/data).
-    - Notificar que los datos están listos.
-
-** Preprocesamiento / features
-    Objetivo: aplicar transformaciones simples sobre los datos (limpieza, normalización, splits train/test).
-    En cualquier flujo ML, los datos crudos no van directo al modelo.
-
-    Tareas:
-    - Cargar datos desde MinIO/Postgres.
-    - Hacer limpieza básica (ej. drop NaN, codificación).
-    -Guardar dataset procesado en MinIO.
-
-** Entrenamiento de modelo
-    Objetivo: entrenar un modelo ML y registrarlo en MLflow.
-    Es el corazón del proyecto, muestra la integración Airflow → MLflow.
-
-    Tareas:
-    - Descargar dataset procesado.
-    - Entrenar modelo (ej. LogisticRegression o RandomForest).
-    - Guardar métricas y parámetros en MLflow Tracking.
-    - Registrar el modelo en el Model Registry de MLflow.
-
-** Evaluación del modelo
-    Objetivo: validar la performance de un modelo entrenado.
-    Permite comparar versiones del modelo, condición típica en MLOps.
-
-    Tareas:
-    - Cargar modelo de MLflow.Evaluar en test set.
-    - Guardar métricas en MLflow (accuracy, f1, etc.).
-    - (Opcional) decidir si el modelo “pasa a producción”.
-
-** Despliegue simulado
-    Objetivo: simular un despliegue en producción.
-    Mostrar cómo un modelo aprobado se expone como API (aunque sea dummy).
-
-    Tareas:
-    - Descargar modelo “aprobado” desde MLflow Registry.
-    - Guardarlo en MinIO en carpeta production/.
-    - (Opcional) lanzar un contenedor con FastAPI que sirva predicciones.
-
-
-OBS Airflow:
-- Si no muestra el DAG como corresponde, eliminar esta carpeta:
-  \operaciones-aprendizaje-maquina\airflow\dags\__pycache__
-  luego correr: docker compose restart airflow-apiserver airflow-scheduler
-
-
-  ML
-  =====
-  Dentro de esta carpeta deberia estar nuestro modelo.
-  Cree archivos dummy solo para las pruebas de Airflow
-  Por el amor de STEVE JOBS , poner un modelo nuestro, sencillo pero nuestro.
+volumes:
+  db_data:

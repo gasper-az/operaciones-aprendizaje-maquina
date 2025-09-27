@@ -51,6 +51,7 @@ x-airflow-common: &airflow-common
     - ${AIRFLOW_PROJ_DIR:-./airflow}/config:/opt/airflow/config
     - ${AIRFLOW_PROJ_DIR:-./airflow}/plugins:/opt/airflow/plugins
     - ${AIRFLOW_PROJ_DIR:-./airflow}/secrets:/opt/secrets
+    - ./ml:/opt/airflow/ml #Monta ml en el container de airflow
   networks:
     - backend
   user: "${AIRFLOW_UID:-50000}:${AIRFLOW_GID:-0}"
@@ -73,7 +74,12 @@ services:
       --port 5000
       --serve-artifacts
     volumes:
+      # requirements.txt solo lectura
       - ./requirements.txt:/app/requirements.txt:ro
+      # monta tu código fuente local
+      - ./ml:/app/ml
+      - ./notebooks:/app/notebooks
+      - ./utilities:/app/utilities
     environment:
       - AWS_ACCESS_KEY_ID=${MINIO_ACCESS_KEY:-minio}
       - AWS_SECRET_ACCESS_KEY=${MINIO_SECRET_ACCESS_KEY:-minio123}
