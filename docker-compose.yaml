@@ -53,6 +53,7 @@ x-airflow-common: &airflow-common
     - ${AIRFLOW_PROJ_DIR:-./airflow}/plugins:/opt/airflow/plugins
     - ${AIRFLOW_PROJ_DIR:-./airflow}/secrets:/opt/secrets
     - ./ml:/opt/airflow/ml #Monta ml en el container de airflow
+    - ./utilities/scripts:/opt/airflow/utilities/scripts
   networks:
     - backend
   user: "${AIRFLOW_UID:-50000}:${AIRFLOW_GID:-0}"
