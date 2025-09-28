@@ -32,29 +32,31 @@ with DAG(
         python_callable=check_external_file,
     )
 
-    t2 = PythonOperator(
-        task_id="copy_file_to_raw",
-        python_callable=move_to_raw,
-    )
+    # t2 = PythonOperator(
+    #     task_id="copy_file_to_raw",
+    #     python_callable=move_to_raw,
+    # )
 
     t3 = BashOperator(
         task_id="preprocess_data",
         bash_command="python /opt/airflow/ml/preprocess.py "
     )
 
-    t4 = BashOperator(
-        task_id="train_model",
-        bash_command="python /opt/airflow/ml/train.py "
-    )
+    # t4 = BashOperator(
+    #     task_id="train_model",
+    #     bash_command="python /opt/airflow/ml/train.py "
+    # )
 
-    t5 = BashOperator(
-        task_id="evaluate_model",
-        bash_command="python /opt/airflow/ml/eval.py "
-    )
+    # t5 = BashOperator(
+    #     task_id="evaluate_model",
+    #     bash_command="python /opt/airflow/ml/eval.py "
+    # )
 
-    t6 = BashOperator(
-        task_id="deploy_model",
-        bash_command="python /opt/airflow/utilities/promote_model.py "
-    )
+    # t6 = BashOperator(
+    #     task_id="deploy_model",
+    #     bash_command="python /opt/airflow/utilities/promote_model.py "
+    # )
 
-    t1 >> t2 >> t3 >> t4 >> t5 >> t6
+    #t1 >> t2 >> t3 >> t4 >> t5 >> t6
+
+    t1 >> t3
