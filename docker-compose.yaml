@@ -118,6 +118,7 @@ services:
 
   createbuckets:
     image: minio/mc:latest
+    container_name: s3_create_bucket #minio_create_bucket
     depends_on:
       - s3 #minio
     entrypoint: >
@@ -175,6 +176,7 @@ services:
 
   airflow-apiserver:
     <<: *airflow-common
+    container_name: airflow-apiserver
     command: api-server
     ports:
       - "${AIRFLOW_PORT:-8080}:8080"

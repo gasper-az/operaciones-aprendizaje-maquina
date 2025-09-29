@@ -8,7 +8,7 @@ TRAIN_PROCESSED_PATH = os.path.join(BASE_PATH, "processed", "bodyfat_processed_t
 TEST_PROCESSED_PATH = os.path.join(BASE_PATH, "processed", "bodyfat_processed_test.csv")
 
 # Esto nos permite hacer import de /utilities/scripts
-sys.path.append(os.path.abspath(os.path.join(os.getcwd(), '../')))
+sys.path.append("/opt/airflow/")
 
 from utilities.scripts.procesamiento import (split_dataframe_train_test,
                                              agregar_bmi, categorizar_bmi,
