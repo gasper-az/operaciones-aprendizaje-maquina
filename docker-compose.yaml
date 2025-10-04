@@ -42,6 +42,8 @@ x-airflow-common: &airflow-common
     AWS_SECRET_ACCESS_KEY: ${MINIO_SECRET_ACCESS_KEY:-minio123}
     AWS_ENDPOINT_URL_S3: http://s3:9000
     MLFLOW_S3_ENDPOINT_URL: http://s3:9000
+    AIRFLOW__API__WORKERS: '1' # https://github.com/apache/airflow/issues/52270
+    AIRFLOW__CORE__HOSTNAME_CALLABLE: socket.gethostname # https://lists.apache.org/thread/m9hf0vdjw5crvld3r21gw8bfrllk752j
     #AIRFLOW__API__AUTH_BACKENDS: 'airflow.api.auth.backend.session'
     #AIRFLOW__CORE__TEST_CONNECTION: 'Enabled'
   volumes:
@@ -52,6 +54,7 @@ x-airflow-common: &airflow-common
     - ${AIRFLOW_PROJ_DIR:-./airflow}/plugins:/opt/airflow/plugins
     - ${AIRFLOW_PROJ_DIR:-./airflow}/secrets:/opt/secrets
     - ./ml:/opt/airflow/ml #Monta ml en el container de airflow
+    - ./utilities/scripts:/opt/airflow/utilities/scripts
   networks:
     - backend
   user: "${AIRFLOW_UID:-50000}:${AIRFLOW_GID:-0}"
@@ -89,14 +92,14 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-      minio:
+      s3:
         condition: service_started
     networks:
       - backend
 
-  minio:
+  s3: #minio
     image: minio/minio:latest
-    container_name: minio
+    container_name: s3 #minio
     command: server /data --console-address :9001
     environment:
       - MINIO_ROOT_USER=${MINIO_ACCESS_KEY:-minio}
@@ -116,8 +119,9 @@ services:
 
   createbuckets:
     image: minio/mc:latest
+    container_name: s3_create_bucket #minio_create_bucket
     depends_on:
-      - minio
+      - s3 #minio
     entrypoint: >
       /bin/sh -c '
       sleep 5;
@@ -173,6 +177,7 @@ services:
 
   airflow-apiserver:
     <<: *airflow-common
+    container_name: airflow-apiserver
     command: api-server
     ports:
       - "${AIRFLOW_PORT:-8080}:8080"
