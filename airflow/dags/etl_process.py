@@ -14,17 +14,12 @@ def check_external_file():
         raise FileNotFoundError(f"No se encontró {EXTERNAL_PATH}")
     print(f"[OK] Archivo encontrado en external/: {EXTERNAL_PATH}")
 
-def move_to_raw():
-    os.makedirs(os.path.dirname(RAW_PATH), exist_ok=True)
-    shutil.copy(EXTERNAL_PATH, RAW_PATH)
-    print(f"[OK] Archivo copiado a raw/: {RAW_PATH}")
-
 with DAG(
-    dag_id="dag_bodyfat_pipeline",
+    dag_id="etl_process",
     start_date=datetime(2025, 1, 1),
     schedule=None,
     catchup=False,
-    tags=["bodyfat", "pipeline"],
+    tags=["bodyfat", "etl", "pipeline"],
 ) as dag:
 
     t1 = PythonOperator(
@@ -32,24 +27,9 @@ with DAG(
         python_callable=check_external_file,
     )
 
-    t2 = PythonOperator(
-        task_id="copy_file_to_raw",
-        python_callable=move_to_raw,
+    t2= BashOperator(
+        task_id="preprocess_data",
+        bash_command="python /opt/airflow/ml/preprocess.py "
     )
 
-    t3 = BashOperator(
-        task_id="train_model",
-        bash_command="python /opt/airflow/ml/train.py "
-    )
-
-    t4 = BashOperator(
-        task_id="evaluate_model",
-        bash_command="python /opt/airflow/ml/eval.py "
-    )
-
-    t5 = BashOperator(
-        task_id="deploy_model",
-        bash_command="python /opt/airflow/utilities/promote_model.py "
-    )
-
-    t1 >> t2 >> t3 >> t4 >> t5
+    t1 >> t2

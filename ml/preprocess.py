@@ -16,8 +16,10 @@ from utilities.scripts.procesamiento import (split_dataframe_train_test,
                                              one_hot_encoding_bmi,
                                              codificar_dummy_feature,
                                              escalar_features)
-from utilities.scripts.commons import (guardar_train_test)
-from utilities.scripts.constants import (TARGET, TEST_SIZE, RANDOM_STATE)
+from utilities.scripts.constants import (TARGET, TEST_SIZE, RANDOM_STATE,
+                                         S3_DATA_PROCESSED, TRAIN_SUBFOLDER,
+                                         TEST_SUBFOLDER, X_CSV, Y_CSV)
+from utilities.scripts.s3 import (save_data)
 
 def main():
     if not os.path.exists(RAW_PATH):
@@ -66,13 +68,16 @@ def main():
                      scaler="StandardScaler", columnas=cols_a_escalar)
     
     print("[INFO][preprocess] Escalado aplicado.")
-
-    guardar_train_test(X_train=X_train, X_test=X_test,
-                       y_train=y_train, y_test=y_test,
-                       train_path=TRAIN_PROCESSED_PATH,
-                       test_path=TEST_PROCESSED_PATH)
     
-    print("[INFO][preprocess] Archivos guardados.")
+    train_path = os.path.join(S3_DATA_PROCESSED, TRAIN_SUBFOLDER)
+    test_path = os.path.join(S3_DATA_PROCESSED, TEST_SUBFOLDER)
+
+    # Se guardan los datos de train.
+    save_data(X=X_train, y=y_train, base_path=train_path, x_name=X_CSV, y_name=Y_CSV)
+    # Se guardan los datos de test.
+    save_data(X=X_test, y=y_test, base_path=test_path, x_name=X_CSV, y_name=Y_CSV)
+
+    print("[INFO][preprocess] Archivos guardados en s3.")
 
 if __name__ == "__main__":
     try:

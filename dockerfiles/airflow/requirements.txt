@@ -11,3 +11,4 @@ matplotlib
 optuna
 xgboost
 scipy
+awswrangler
