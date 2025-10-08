@@ -2,17 +2,19 @@ from airflow import DAG
 from airflow.operators.bash import BashOperator
 from airflow.operators.python import PythonOperator
 from datetime import datetime
-import os
-import shutil
+import os, shutil
+from dotenv import load_dotenv
 
-BASE_PATH = "/opt/data"
-EXTERNAL_PATH = os.path.join(BASE_PATH, "external", "bodyfat.csv")
-RAW_PATH = os.path.join(BASE_PATH, "raw", "bodyfat.csv")
+# Configuración
+load_dotenv("/opt/airflow/.env")
+BASE_PATH = os.getenv("BASE_PATH", "/opt/data")
+RAW_PATH = os.getenv("RAW_PATH", os.path.join(BASE_PATH, "raw", "bodyfat.csv"))
+EXTERNAL_PATH = os.path.join(BASE_PATH, "external", os.path.basename(RAW_PATH))
 
 def check_external_file():
     if not os.path.exists(EXTERNAL_PATH):
         raise FileNotFoundError(f"No se encontró {EXTERNAL_PATH}")
-    print(f"[OK] Archivo encontrado en external/: {EXTERNAL_PATH}")
+    print(f"[OK] Archivo encontrado: {EXTERNAL_PATH}")
 
 def move_to_raw():
     os.makedirs(os.path.dirname(RAW_PATH), exist_ok=True)
@@ -27,29 +29,34 @@ with DAG(
     tags=["bodyfat", "pipeline"],
 ) as dag:
 
-    t1 = PythonOperator(
+    check_file = PythonOperator(
         task_id="check_file_external",
         python_callable=check_external_file,
     )
 
-    t2 = PythonOperator(
+    copy_file = PythonOperator(
         task_id="copy_file_to_raw",
         python_callable=move_to_raw,
     )
+    
+    preprocess = BashOperator(
+        task_id="preprocess_data",
+        bash_command="python /opt/airflow/ml/preprocess.py"
+    )
 
-    t3 = BashOperator(
+    train = BashOperator(
         task_id="train_model",
         bash_command="python /opt/airflow/ml/train.py "
     )
 
-    t4 = BashOperator(
+    eval = BashOperator(
         task_id="evaluate_model",
         bash_command="python /opt/airflow/ml/eval.py "
     )
 
-    t5 = BashOperator(
+    deploy = BashOperator(
         task_id="deploy_model",
-        bash_command="python /opt/airflow/utilities/promote_model.py "
+        bash_command="python /opt/airflow/ml/promote_model.py "
     )
 
-    t1 >> t2 >> t3 >> t4 >> t5
+    check_file >> copy_file >> preprocess >> train >> eval >> deploy
