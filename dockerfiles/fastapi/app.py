@@ -5,21 +5,13 @@ import pandas as pd
 
 from typing import Any, Tuple
 
-from fastapi import FastAPI, Body, BackgroundTasks
+from fastapi import FastAPI, Body
 from fastapi.responses import JSONResponse
 from fastapi.encoders import jsonable_encoder
 from pydantic import BaseModel, Field
 from typing_extensions import Annotated
 
-import awswrangler as wr
-from scipy import stats
-
-sys.path.append("../../")
-
-os.environ["AWS_ACCESS_KEY_ID"]="minio"   
-os.environ["AWS_SECRET_ACCESS_KEY"]="minio123" 
-os.environ["MLFLOW_S3_ENDPOINT_URL"]="http://localhost:9000"
-os.environ["AWS_ENDPOINT_URL_S3"]="http://localhost:9000"
+sys.path.append("../")
 
 from utilities.scripts.constants import (
     MODEL_NAME, MODEL_ALIAS,
@@ -38,7 +30,7 @@ from utilities.scripts.procesamiento import (
 
 from utilities.scripts.s3 import load_data
 
-MLFLOW_TRACKING_URL = "http://localhost:5001" #os.getenv("MLFLOW_TRACKING_URL", "http://mlflow:5001")
+MLFLOW_TRACKING_URL = os.getenv("MLFLOW_TRACKING_URL", "http://mlflow:5000")
 
 def cargar_modelo(name: str, alias: str) -> Tuple[Any, int]:
     """
@@ -68,9 +60,7 @@ def cargar_train_data() -> Tuple[pd.DataFrame, pd.Series]:
     """
     train_path = os.path.join(S3_DATA_PRE_PROCESSED, TRAIN_SUBFOLDER)
 
-    # X_train, y_train = load_data(base_path=train_path, x_name=X_CSV, y_name=Y_CSV)
-    X_train = wr.s3.read_csv("s3://data/body_fat/preprocessed/train/X.csv")
-    y_train = wr.s3.read_csv("s3://data/body_fat/preprocessed/train/y.csv")
+    X_train, y_train = load_data(base_path=train_path, x_name=X_CSV, y_name=Y_CSV)
     return X_train, y_train
 
 class ModelInput(BaseModel):
@@ -242,7 +232,7 @@ def preprocesar(X_train:pd.DataFrame, X_test: pd.DataFrame) -> Tuple[pd.DataFram
     """
     colBMI = "BMI"
     colBMI_cat = "BMI_cat"
-
+    
     agregar_bmi(X_train, bmiCol=colBMI)
     categorizar_bmi(X_train, bmiCol=colBMI, categoryCol=colBMI_cat)
     
@@ -271,8 +261,6 @@ def preprocesar(X_train:pd.DataFrame, X_test: pd.DataFrame) -> Tuple[pd.DataFram
 
 # Carga de Modelo para predicción.
 modelo, version = cargar_modelo(name=MODEL_NAME, alias=MODEL_ALIAS)
-# Carga de datos para procesamiento.
-X_train, y_train = cargar_train_data()
 
 app = FastAPI()
 
@@ -291,9 +279,12 @@ def predict(
         ModelInput,
         Body(embed=True),
     ],
-    background_tasks: BackgroundTasks
 ):
     df = model_to_dataframe(model=features)
+    
+    # Carga de datos para procesamiento.
+    X_train, _ = cargar_train_data()
+    
     _, processed = preprocesar(X_train=X_train, X_test=df)
 
     prediccion = modelo.predict(processed)
