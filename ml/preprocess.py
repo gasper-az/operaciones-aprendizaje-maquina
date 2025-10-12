@@ -32,7 +32,8 @@ from utilities.scripts.procesamiento import (
 )
 from utilities.scripts.constants import (
     TARGET, TEST_SIZE, RANDOM_STATE,
-    S3_DATA_PROCESSED, TRAIN_SUBFOLDER, TEST_SUBFOLDER,
+    S3_DATA_PRE_PROCESSED, S3_DATA_PROCESSED,
+    TRAIN_SUBFOLDER, TEST_SUBFOLDER,
     X_CSV, Y_CSV
 )
 from utilities.scripts.s3 import save_data
@@ -50,6 +51,11 @@ def main():
         test_size=TEST_SIZE
     )
     print("[INFO][preprocess] Split train y test completo.")
+
+    pre_train_path = os.path.join(S3_DATA_PRE_PROCESSED, TRAIN_SUBFOLDER)
+    save_data(X_train, y_train, base_path=pre_train_path, x_name=X_CSV, y_name=Y_CSV)
+
+    print("[INFO][preprocess] Archivos pre-preproesamiento guardados en S3.")
 
     colBMI = "BMI"
     colBMI_cat = "BMI_cat"

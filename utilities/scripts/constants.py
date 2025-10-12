@@ -4,6 +4,7 @@ RANDOM_STATE = 323123
 
 S3_DATA_BASE_PATH = "s3://data"
 S3_DATA_EXTERNAL = "s3://data/body_fat/external"
+S3_DATA_PRE_PROCESSED = "s3://data/body_fat/preprocessed"
 S3_DATA_PROCESSED = "s3://data/body_fat/processed"
 S3_DATA_RAW = "s3://data/body_fat/raw"
 
@@ -13,3 +14,6 @@ TEST_SUBFOLDER = "test"
 BODY_FAT_CSV = "bodyfat.csv"
 X_CSV = "X.csv"
 Y_CSV = "y.csv"
+
+MODEL_NAME = "body_fat_productive"
+MODEL_ALIAS = "champion"
