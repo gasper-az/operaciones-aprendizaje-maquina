@@ -20,7 +20,20 @@ El objetivo es desplegar y orquestar un pipeline de MLOps con los siguientes ser
 - **PostgreSQL**: base de datos backend para MLflow y Airflow.
 - **Valkey (Redis fork)**: backend para ejecución distribuida de Airflow.
 
-## Guía - ¿Cómo ejecutar la aplicación?
+***DAGs*** de Airflow
+
+- `dag_bodyfat_pipeline`: se encuentra definido en [/airflow/dags/dag_pipeline.py](./airflow/dags/dag_pipeline.py), y su propósito es realizar el preprocesamiento del `BodyFat` dataset (ver [/data/external/bodyfat.csv](/data/external/bodyfat.csv)), entrenar un modelo de machine learning, evaluar el modelo de machine learning, y promover dicho modelo mediante `MLFLow` a producción.
+
+***REST API***
+
+- Configurada mediante *FastAPI*, se encuentra definida en [/dockerfiles/fastapi/app.py](/dockerfiles/fastapi/app.py),
+- Posee dos endpoints:
+  - `GET` `<host>:<port>/`: el cual consiste en un *welcome message* a fin de testear rápidamente la API.
+  - `POST` `<host>:<port>/predict`: el cual permite realizar predicciones utilizando el modelo productivo de `MLFLow`, en función de los datos enviados en el *body*.
+
+En la sección `Realizar predicciones mediante REST API` se encuentran los pasos necesarios para probar estos endpoints mediante [Postman](https://www.postman.com/).
+
+## Guía - ¿Cómo ejecutar y testear la aplicación?
 
 ### Pre-requisitos
 
@@ -169,13 +182,21 @@ En cuanto al `<host>` y `<port>`, estos son:
 
 ***Referencias***
 
-1. **Redis** se utiliza para configurar **Airflow** al inicializar los servicios.
-1. **Apache Airflow** consume el dataset de *BodyFat*, realizando distintas operaciones sobre el mismo.
-1. **Apache Airflow** guarda el dataset procesado de *BodyFat* en **PostgreSQL**.
-1. Mediante **MLFlow** se consume el dataset desde **PostgreSQL** con el fin de generar un modelo de *Machine Learning*.
+1. Configuración inicial:
+   1. **Redis** se utiliza para configurar **Airflow** al inicializar los servicios.
+   1. **PostgreSQL** se utiliza para configurar **Airflow** y **MLFlow** al inicializar los servicios.
+1. **Apache Airflow** - ejecución del *DAG*:
+   1. Se ejecuta el *DAG* de `dag_bodyfat_pipeline` manualmente.
+   1. Se preprocesa el dataset de `BodyFat`.
+1. **Apache Airflow** guarda el dataset procesado de *BodyFat* en **s3**.
+   1. En el bucket de `s3://data` se guardan los datasets de *train* y *test*.
+1. Mediante **MLFlow** se consume el dataset desde **s3** con el fin de generar un modelo de *Machine Learning*.
 1. Una vez generado el modelo, **MLFlow** lo guarda en **s3**.
-1. Independientemente de los otros pasos, un *Usuario Final* realiza un llamado a la **REST API** para realizar una inferencia.
-1. La **REST API** consume el modelo desde **s3**, realiza la inferencia, y le devuelve un resultado al *Usuario Final*.
+   1. En el bucket de `s3://mlflow` se guardan los modelos entrenados, como así también los modelos productivos.
+1. *Usuario Final* realiza un llamado a la **REST API** para realizar una inferencia.
+   1. El endpoint en donde se expone el modelo productivo es `POST /predict`.
+1. La **REST API** consume el modelo desde **s3**, realiza la inferencia, y genera un resultado para el *Usuario Final*.
+1. La **REST API** le devuelve un *response* con la inferencia al *Usuario Final*.
 
 ### Entrega 1
 
