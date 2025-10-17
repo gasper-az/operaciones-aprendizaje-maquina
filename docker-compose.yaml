@@ -15,7 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 #
-# Modified by Facundo Lucianna and Rodrigo Lauro — Oct 2025
+# Modified by Facundo Lucianna, Rodrigo Lauro and Gaspar Acevedo Zain — Oct 2025
 # WARNING: For local development only. Not for production.
 
 x-airflow-common: &airflow-common
@@ -43,7 +43,7 @@ x-airflow-common: &airflow-common
     AIRFLOW__API__WORKERS: '1'
     AIRFLOW__CORE__HOSTNAME_CALLABLE: socket.gethostname
   volumes:
-    - ./data:/opt/data                  # ✅ carpeta local data montada correctamente
+    - ./data:/opt/data
     - ${AIRFLOW_PROJ_DIR:-./airflow}/dags:/opt/airflow/dags
     - ${AIRFLOW_PROJ_DIR:-./airflow}/logs:/opt/airflow/logs
     - ${AIRFLOW_PROJ_DIR:-./airflow}/config:/opt/airflow/config
@@ -129,11 +129,6 @@ services:
     build: "./dockerfiles/fastapi"
     image: backend_fastapi
     container_name: fastapi
-    # depends_on:
-    #   mlflow:
-    #     condition: service_healthy
-    #   airflow-apiserver:
-    #     condition: service_healthy
     ports:
       - "${FASTAPI_PORT:-8800}:8800"
     networks:
