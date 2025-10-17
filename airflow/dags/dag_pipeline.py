@@ -12,11 +12,20 @@ RAW_PATH = os.getenv("RAW_PATH", os.path.join(BASE_PATH, "raw", "bodyfat.csv"))
 EXTERNAL_PATH = os.path.join(BASE_PATH, "external", os.path.basename(RAW_PATH))
 
 def check_external_file():
+    """
+    Indica si el archivo con dataset existe o no.
+    Raises:
+        FileNotFoundError: si el archivo `bodyfat.csv` NO existe en
+            el path configurado.
+    """
     if not os.path.exists(EXTERNAL_PATH):
         raise FileNotFoundError(f"No se encontró {EXTERNAL_PATH}")
     print(f"[OK] Archivo encontrado: {EXTERNAL_PATH}")
 
 def move_to_raw():
+    """
+    Mueve el archivo con dataset a la carpeta `raw`.
+    """
     os.makedirs(os.path.dirname(RAW_PATH), exist_ok=True)
     shutil.copy(EXTERNAL_PATH, RAW_PATH)
     print(f"[OK] Archivo copiado a raw/: {RAW_PATH}")

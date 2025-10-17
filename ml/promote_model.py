@@ -19,7 +19,6 @@ client = MlflowClient()
 
 print(f"[INFO] Promocionando modelo '{MODEL_NAME}' a producción...")
 
-# Buscar el experimento y el run correspondiente
 experiment = mlflow.get_experiment_by_name(EXPERIMENT_NAME)
 runs = mlflow.search_runs(
     experiment_ids=experiment.experiment_id,
@@ -35,7 +34,6 @@ model_uri = f"runs:/{run_id}/{MODEL_NAME}"
 
 print(f"[INFO] Mejor modelo encontrado con run_id={run_id} (R2={best_run['metrics.R2']:.4f})")
 
-# Registrar o actualizar modelo productivo
 try:
     client.get_registered_model(PROD_MODEL_NAME)
 except Exception:
@@ -51,6 +49,5 @@ model_version = client.create_model_version(
     description="Promoción automática del modelo entrenado más reciente."
 )
 
-# Marcar este modelo como 'champion'
 client.set_registered_model_alias(PROD_MODEL_NAME, "champion", model_version.version)
 print(f"[OK] Modelo '{PROD_MODEL_NAME}' actualizado como champion (versión {model_version.version}).")

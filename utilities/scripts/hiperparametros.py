@@ -6,8 +6,6 @@ from sklearn.ensemble import HistGradientBoostingRegressor
 from xgboost import XGBRegressor
 import optuna
 
-# Muestra información en cada iteración de la búsqueda de hiperparámetros bayesiana realizada por Optuna.
-# Se utiliza como callback al llamar al método optimize de optuna.
 def champion_callback(study, frozen_trial):
     """
     Mostramos menos información, sino es demasiado verboso
@@ -26,8 +24,10 @@ def champion_callback(study, frozen_trial):
         else:
             print(f"Initial trial {frozen_trial.number} achieved value: {frozen_trial.value}")
 
-# Función objetivo para SVR, necesaria para trabajar con optuna.
 def objective_SVR(trial, X_train, y_train, cv, scoring = "neg_root_mean_squared_error"):
+    """
+    Función objetivo del framework optuna para el modelo SVR.
+    """
     kernel = trial.suggest_categorical("kernel", ["linear", "poly", "rbf", "sigmoid"])
     gamma = trial.suggest_float("gamma", 1e-4, 1.0, log=True)
     epsilon = trial.suggest_float("epsilon", 1e-4, 1.0, log=True)
@@ -46,8 +46,10 @@ def objective_SVR(trial, X_train, y_train, cv, scoring = "neg_root_mean_squared_
     
     return score.mean() * (-1)
 
-# Función objetivo para Decision Tree, necesaria para trabajar con optuna.
 def objective_DecisionTree(trial, random_state, X_train, y_train, cv, scoring = "neg_root_mean_squared_error"):
+    """
+    Función objetivo del framework optuna para el modelo Decision Tree.
+    """
     max_depth = trial.suggest_categorical("max_depth", [None,10,20,30])
     min_samples_split = trial.suggest_categorical("min_samples_split", [2, 5, 10])
     min_samples_leaf = trial.suggest_categorical("min_samples_leaf", [1, 2, 4])
@@ -64,8 +66,10 @@ def objective_DecisionTree(trial, random_state, X_train, y_train, cv, scoring = 
 
     return score.mean() * (-1)
 
-# Función objetivo para Random Forest, necesaria para trabajar con optuna.
 def objective_RF(trial, random_state, X_train, y_train, cv, scoring = "neg_root_mean_squared_error"):
+    """
+    Función objetivo del framework optuna para el modelo Random Forest.
+    """
     n_estimators = trial.suggest_categorical("n_estimators", [100, 500, 1000, 1500])
     criterion = trial.suggest_categorical("criterion", ["squared_error", "absolute_error", "friedman_mse", "poisson"])
     max_depth = trial.suggest_categorical("max_depth", [None,10,20,30])
@@ -88,8 +92,10 @@ def objective_RF(trial, random_state, X_train, y_train, cv, scoring = "neg_root_
     
     return score.mean() * (-1)
 
-# Función objetivo para HGB, necesaria para trabajar con optuna.
 def objective_HGB(trial, random_state, X_train, y_train, cv, scoring = "neg_root_mean_squared_error"):
+    """
+    Función objetivo del framework optuna para el modelo HGB.
+    """
     loss = trial.suggest_categorical("loss", ["squared_error", "absolute_error", "gamma", "poisson", "quantile"])
     learning_rate = trial.suggest_categorical("learning_rate", [0.01, 0.05, 0.1])
     max_iter = trial.suggest_int("max_iter", 100, 1000, step=100)
@@ -119,8 +125,10 @@ def objective_HGB(trial, random_state, X_train, y_train, cv, scoring = "neg_root
     
     return score.mean() * (-1)
 
-# Función objetivo para XGBoost, necesaria para trabajar con optuna.
 def objective_XGBoost(trial, random_state, X_train, y_train, cv, scoring = "neg_root_mean_squared_error"):
+    """
+    Función objetivo del framework optuna para el modelo XGBoost.
+    """
     max_depth = trial.suggest_int("max_depth", 2, 10, step=1)
     min_child_weight = trial.suggest_int("min_child_weight", 1, 10, step=1)
     subsample = trial.suggest_float("subsample", 0.6, 1.0, step=0.05)

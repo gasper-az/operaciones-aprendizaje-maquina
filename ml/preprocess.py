@@ -2,14 +2,6 @@ import sys
 import os
 import pandas as pd
 
-
-
-
-#from dotenv import load_dotenv
-
-# Cargar variables desde .env (por compatibilidad local)
-#load_dotenv()
-
 # ============================
 # PATHS DESDE .env
 # ============================
@@ -18,7 +10,6 @@ BASE_PATH = os.getenv("BASE_PATH", "/opt/data")
 RAW_PATH = os.getenv("RAW_PATH", os.path.join(BASE_PATH, "raw", "bodyfat.csv"))
 PROCESSED_PATH = os.getenv("PROCESSED_PATH", os.path.join(BASE_PATH, "processed"))
 
-# Imports de Airflow
 sys.path.append("/opt/airflow/")
 
 from utilities.scripts.procesamiento import (
@@ -89,7 +80,6 @@ def main():
     escalar_features(X_train, X_test, scaler="StandardScaler", columnas=cols_a_escalar)
     print("[INFO][preprocess] Escalado completo.")
 
-    # Guardar en MinIO
     train_path = os.path.join(S3_DATA_PROCESSED, TRAIN_SUBFOLDER)
     test_path = os.path.join(S3_DATA_PROCESSED, TEST_SUBFOLDER)
 

@@ -8,9 +8,22 @@
 - Lauro, Rodrigo (ing.rodrigo.lauro@gmail.com)
 - Rodrigues da Cruz, Nicolás (Nicolasrdc151@gmail.com)
 
+## Índice
+
+- [Descripción](#descripción)
+- [Guía - ¿Cómo ejecutar y testear la aplicación?](#guía---cómo-ejecutar-y-testear-la-aplicación)
+  - [Clonado del repositorio](#clonado-del-repositorio)
+  - [Crear imágenes, volúmenes y contenedores](#creación-de-imágenes-volúmenes-y-contenedores-mediante-docker-compose)
+  - [Preprocesamiento y entrenamiento mediante DAG](#preprocesamiento-de-dataset-y-entrenamiento-de-modelo)
+  - [Realizar predicciones](#realizar-predicciones-mediante-rest-api)
+- [Diagram](#diagrama)
+- [Entregas](#entregas)
+- [Estructura de carpetas](#estructura-de-carpetas)
+- [Comandos útiles](#comandos-útiles)
+
 ## Descripción
 
-Implementación de un modelo de Machine Learning (**Body Fat Analysis**) en un entorno productivo simulado con **Docker Compose**.  
+Implementación de un modelo de Machine Learning basado en el [Body Fat Prediction Dataset](https://www.kaggle.com/datasets/fedesoriano/body-fat-prediction-dataset) en un entorno productivo simulado con **Docker Compose**.  
 El objetivo es desplegar y orquestar un pipeline de MLOps con los siguientes servicios:
 
 - **Apache Airflow**: orquestación de flujos de trabajo (DAGs de entrenamiento y predicción).
@@ -20,33 +33,185 @@ El objetivo es desplegar y orquestar un pipeline de MLOps con los siguientes ser
 - **PostgreSQL**: base de datos backend para MLflow y Airflow.
 - **Valkey (Redis fork)**: backend para ejecución distribuida de Airflow.
 
-### Cómo inicializar la aplicación?
+***DAGs*** de Airflow
 
-***Pre requisitos***
+- `dag_bodyfat_pipeline`: se encuentra definido en [/airflow/dags/dag_pipeline.py](./airflow/dags/dag_pipeline.py), y su propósito es realizar el preprocesamiento del `BodyFat` dataset (ver [/data/external/bodyfat.csv](/data/external/bodyfat.csv)), entrenar un modelo de machine learning, evaluar el modelo de machine learning, y promover dicho modelo mediante `MLFLow` a producción.
 
-1. `git`.
-1. `docker` o `docker desktop`.
+***REST API***
 
-***Pasos necesarios***
+- Configurada mediante *FastAPI*, se encuentra definida en [/dockerfiles/fastapi/app.py](/dockerfiles/fastapi/app.py),
+- Posee dos endpoints:
+  - `GET` `<host>:<port>/`: el cual consiste en un *welcome message* a fin de testear rápidamente la API.
+  - `POST` `<host>:<port>/predict`: el cual permite realizar predicciones utilizando el modelo productivo de `MLFLow`, en función de los datos enviados en el *body*.
 
-1. Clonar el repo: `git clone https://github.com/gasper-az/operaciones-aprendizaje-maquina.git`.
-1. Una vez descargado, ubicarse en el directorio del repositorio: `cd operaciones-aprendizaje-maquina`.
-1. Asegurarse que `docker` (o `docker desktop`) esté inicializado y funcionando correctamente.
-1. Ejecutar el comando `docker compose up`.
+En la sección `Realizar predicciones mediante REST API` se encuentran los pasos necesarios para probar estos endpoints mediante [Postman](https://www.postman.com/).
 
-### Diagrama
+## Guía - ¿Cómo ejecutar y testear la aplicación?
+
+### Pre-requisitos
+
+1. `git` para clonar el repositorio.
+1. `docker` o [docker desktop](https://docs.docker.com/desktop/), para ejecutar la aplicación localmente.
+1. [Postman](https://www.postman.com/) para testear la REST API.
+
+### Step-by-step guide
+
+#### Clonado del repositorio
+
+En esta sección se explican los pasos necesarios para clonar el repositorio:
+
+1. Clonar el repositorio con el siguiente comando:
+   1. `git clone https://github.com/gasper-az/operaciones-aprendizaje-maquina.git`.
+1. Ubicarse en la raíz del directorio del repositorio:
+   1. `cd operaciones-aprendizaje-maquina`.
+1. (opcional) En el caso que exista, borrar en la carpeta `airflow/dags` la subcarpeta `__pycache__`.
+
+#### Creación de imágenes, volúmenes y contenedores mediante docker compose
+
+En esta sección se explican los pasos necesarios para crear las imágenes de docker mediante docker-compose, como así también para crear los containers que se utilizarán en pasos posteriores:
+
+1. Inicializar el servicio de `docker` o `docker desktop` en el sistema.
+1. Ubicarse en la raíz del directorio del repositorio:
+   1. `cd operaciones-aprendizaje-maquina`.
+1. Ejecutar los siguientes comandos de `docker`:
+   1. (recomendado) `docker compose down -v`
+      1. Este comando asegura que, en caso de existir, se detengan los servicios de docker compose.
+   1. (recomendado) `docker system prune -af --volumes`
+      1. Este comando asegura que, en caso de existir, se eliminen los volúmenes utilizados por docker.
+   1. `docker compose build --no-cache`
+      1. Este comando fuerza el *build* de las imágenes necesarias, independientemente de si existen en el sistema o no.
+      1. Al haber varias imágenes involucradas, la ejecución suele demorar varios minutos.
+   1. `docker compose up`
+      1. Este comando crea los *containers* de docker a partir de las imágenes creadas en el paso anterior.
+
+#### Preprocesamiento de dataset y entrenamiento de modelo
+
+En esta sección se explica cómo ejecutar el `DAG` de Airflow que se encarga de preprocesar el dataset, como así también de entrenar y evaluar un modelo de Machine Learning que será posteriromente *promovido* a producción.
+
+1. Asegurarse que el servicio de `airflow-apiserver` está siendo ejecutado correctamente desde docker (o docker desktop).
+
+![airflow-apiserver-container](./images/airflow-apiserver-container.png)
+
+2. Ir al sitio de `Airflow` hosteado localmente en http://localhost:8080/
+3. Loguearse utilizando las credenciales configuradas en el archivo `.env`:
+   - `Usuario`: valor de `_AIRFLOW_WWW_USER_USERNAME`
+   - `Password`: valor de `_AIRFLOW_WWW_USER_USERNAME`
+4. En la sección de `Dags` seleccionar el dag de `dag_bodyfat_pipeline`:
+
+![dags-bodyfat-pipeline](./images/dags-dag-body-fat-pipeline.png)
+
+5. Ejecutar el pipeline mediante el botón `trigger`, y esperar a que éste finalice correctamente:
+
+![dags-trigger-dag-pipeline](./images/dags-trigger-pipeline.png)
+
+6. (opcional) Validar que todos los steps/tasks del pipeline se hayan ejecutado correctamente:
+
+![dags-validation](./images/dags-validation.png)
+
+> Una vez ejecutados todos estos pasos, el modelo habrá sido entrenado, evaluado y promovido a producción mediante `MLFlow`.
+
+#### (opcional) Validar que el modelo esté registrado en MLFlow
+
+Este es un paso opcional, que consiste en corroborar que el modelo entrenado y evaluado en el paso anterior haya sido correctamente *promovido* a `MLFlow`.
+
+> Esta sección ***NO*** requiere la ejecución manual ni automatizada (CLI) de ningún comando.
+
+1. Validar que el container de `MLFlow` y `S3` (`Minio`) estén ejecutándose correctamente en docker (o docker desktop):
+
+![mlflow-s3-containers](./images/mlflow-s3-containers.png)
+
+2. Ingresar al sitio de `MLFlow` hosteado localmente en http://localhost:5001/:
+3. En la sección de `Models` asegurarse que existe el modelo `body_fat_productive` con el alias/tag `champion`:
+
+![mlflow-productive](./images/mlflow-productive-model.png)
+
+#### Realizar predicciones mediante REST API
+
+En esta sección se detallan los pasos para utilizar la REST API mediante `POSTMAN` a fin de realizar predicciones con el modelo productivo.
+
+Actualmente, la REST API tiene *endpoints*:
+
+- `GET` - `<host>:<port>/`: el cual devuelve un *welcome* message, a fin de testear rápidamente la API.
+- `POST` - `<host>:<port>/predict`: el cual permite realizar predicciones, utilizando el modelo deployado en MLFLow.
+
+Para probar ambos casos, es necesario primero asegurarse que el servicio de `fastapi` está siendo ejecutado en docker (o docker desktop):
+
+![fastapi](./images/fastapi.png)
+
+Para probar ambos endpoints se recomienda el uso de `POSTMAN`.
+
+En cuanto al `<host>` y `<port>`, estos son:
+
+- `<host>`: `127.0.0.1` o `localhost`.
+- `<port>`: valor configurado en el archivo `.env`, en la variable `FASTAPI_PORT` (por defecto es `8800`).
+
+##### `GET` method
+
+1. En postman, crear un nuevo *request* del tipo `GET`.
+1. En la *url* poner `http://127.0.0.1:8800`.
+1. Utilizar los *headers* por defecto.
+1. ***NO*** es necesario utilizar Body.
+1. Enviar el request mediante el botón `send`.
+1. El resultado será igual al que se muestra en la siguiente imagen:
+
+![postman-get](./images/postman-get.png)
+
+##### `POST` method
+
+1. En postman, crear un nuevo *request* del tipo `POST`.
+1. En la *url* poner `http://127.0.0.1:8800/predict/`.
+1. En la sección de `headers`, agregar un nuevo registro con *key* `Accept` y *value* `application/json`.
+1. Configurar un `body` similar al siguiente (en postman, seleccionar el tipo `raw`):
+
+```JSON
+{
+    "features": {
+        "density": 1.0708,
+        "age": 23,
+        "weight": 154.25,
+        "height": 67.75,
+        "neck": 36.2,
+        "chest": 93.1,
+        "abdomen": 85.2,
+        "hip": 94.5,
+        "thigh": 59.8,
+        "knee": 37.3,
+        "ankle": 24.0,
+        "bicep": 32.4,
+        "forearm": 26.5,
+        "wrist": 16.6
+    }
+}
+```
+
+5. Enviar el request mediante el botón `send`.
+6. El resultado será similar al que se muestra en la siguiente imagen:
+
+![postman-post](./images/postman-post.png)
+
+## Diagrama
 
 ![diagrama](./diagrams/arquitectura.drawio.png)
 
 ***Referencias***
 
-1. **Redis** se utiliza para configurar **Airflow** al inicializar los servicios.
-1. **Apache Airflow** consume el dataset de *BodyFat*, realizando distintas operaciones sobre el mismo.
-1. **Apache Airflow** guarda el dataset procesado de *BodyFat* en **PostgreSQL**.
-1. Mediante **MLFlow** se consume el dataset desde **PostgreSQL** con el fin de generar un modelo de *Machine Learning*.
+1. Configuración inicial:
+   1. **Redis** se utiliza para configurar **Airflow** al inicializar los servicios.
+   1. **PostgreSQL** se utiliza para configurar **Airflow** y **MLFlow** al inicializar los servicios.
+1. **Apache Airflow** - ejecución del *DAG*:
+   1. Se ejecuta el *DAG* de `dag_bodyfat_pipeline` manualmente.
+   1. Se preprocesa el dataset de `BodyFat`.
+1. **Apache Airflow** guarda el dataset procesado de *BodyFat* en **s3**.
+   1. En el bucket de `s3://data` se guardan los datasets de *train* y *test*.
+1. Mediante **MLFlow** se consume el dataset desde **s3** con el fin de generar un modelo de *Machine Learning*.
 1. Una vez generado el modelo, **MLFlow** lo guarda en **s3**.
-1. Independientemente de los otros pasos, un *Usuario Final* realiza un llamado a la **REST API** para realizar una inferencia.
-1. La **REST API** consume el modelo desde **s3**, realiza la inferencia, y le devuelve un resultado al *Usuario Final*.
+   1. En el bucket de `s3://mlflow` se guardan los modelos entrenados, como así también los modelos productivos.
+1. *Usuario Final* realiza un llamado a la **REST API** para realizar una inferencia.
+   1. El endpoint en donde se expone el modelo productivo es `POST /predict`.
+1. La **REST API** consume el modelo desde **s3**, realiza la inferencia, y genera un resultado para el *Usuario Final*.
+1. La **REST API** le devuelve un *response* con la inferencia al *Usuario Final*.
+
+## Entregas
 
 ### Entrega 1
 
@@ -62,7 +227,7 @@ El objetivo es desplegar y orquestar un pipeline de MLOps con los siguientes ser
 - API usando modelo en Production.
 - Documentación + tests básicos.
 
-### 📂 Estructura de carpetas
+## Estructura de carpetas
 
 ```YAML
 │
@@ -73,16 +238,14 @@ El objetivo es desplegar y orquestar un pipeline de MLOps con los siguientes ser
 │ ├── logs/ # Logs (excluidos del repo)
 │ └── plugins/ # Operadores y hooks personalizados
 │
-├── api/ # Servicio de inferencia con FastAPI
-│ ├── app.py
-│ ├── schemas.py
-│ ├── Dockerfile
-│ └── requirements.txt
-│
 ├── diagrams/
 │
 ├── dockerfiles/
 │   ├── airflow/
+│   │   ├── Dockerfile
+│   │   └── requirements.txt
+│   ├── fatapi/
+│   │   ├── app.py
 │   │   ├── Dockerfile
 │   │   └── requirements.txt
 │   ├── mlflow/
@@ -93,35 +256,36 @@ El objetivo es desplegar y orquestar un pipeline de MLOps con los siguientes ser
 │       ├── requirements.txt
 │       └── mlflow.sql
 │
-├── ml/ # Código fuente del modelo
-│ ├── train.py # Entrenamiento y guardado del modelo
-│ ├── infer.py # Predicción en batch
-│ ├── data_utils.py # Utilidades de carga y preprocesamiento
-│ └── config.yaml # Configuración de hiperparámetros y paths
+├── images/
 │
-├── notebooks/ # Exploración y prototipado de modelos
+├── ml/
+│ ├── eval.py
+│ ├── preprocess.py
+│ ├── promote_model.py
+│ └── train.py
+│
+├── notebooks/
 │ ├── body_fat_analysis.ipynb
 │ └── mlflow_playground.ipynb
 │
 ├── utilities/
-│   └── scripts/ # scripts y otras utilidades
-│       └── mlflow.sql
-│ ├── seed_minio.sh # Inicializar buckets y subir dataset
-│ └── promote_model.py # Promover modelo en MLflow Registry
-│
+│   └── scripts/
+│       ├── commons.py
+│       ├── constants.py
+│       ├── graficos.py
+│       ├── hiperparametros.py
+│       ├── metricas.py
+│       ├── procesamiento.py
+│       └── s3.py
 ├── .env
-├── docker-compose.yaml # Orquestación de servicios
-├── README.md # Documentación del proyecto
-└── requirements.txt # Documentación del proyecto
+├── docker-compose.yaml
+├── README.md
+└── requirements.txt
 ```
 
-### Comandos útiles
+## Comandos útiles
 
-***Requerimientos***
-
-- *Docker* o *docker desktop* instalados
-
-***Comandos***
+Se listan a continuación varios comandos útiles de `docker`:
 
 - Para correr el proyecto:
   - `docker compose up`.

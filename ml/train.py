@@ -9,9 +9,8 @@ from sklearn.metrics import mean_absolute_error, r2_score, root_mean_squared_err
 # ======================================================
 # CONFIGURACIÓN DE ENTORNO Y CREDENCIALES
 # ======================================================
-load_dotenv()  # Carga variables desde .env (si existe)
+load_dotenv()
 
-# Variables de entorno
 os.environ["AWS_ACCESS_KEY_ID"] = os.getenv("MINIO_ACCESS_KEY", "minio")
 os.environ["AWS_SECRET_ACCESS_KEY"] = os.getenv("MINIO_SECRET_ACCESS_KEY", "minio123")
 os.environ["MLFLOW_S3_ENDPOINT_URL"] = os.getenv("MLFLOW_S3_ENDPOINT_URL", "http://minio:9000")
@@ -27,7 +26,6 @@ RUN_NAME = "decision_tree_regressor"
 mlflow.set_tracking_uri(TRACKING_URL)
 client = mlflow.MlflowClient()
 
-# Crear experimento si no existe
 if not mlflow.get_experiment_by_name(EXPERIMENT_NAME):
     mlflow.create_experiment(
         name=EXPERIMENT_NAME,
