@@ -8,6 +8,19 @@
 - Lauro, Rodrigo (ing.rodrigo.lauro@gmail.com)
 - Rodrigues da Cruz, Nicolás (Nicolasrdc151@gmail.com)
 
+## Índice
+
+- [Descripción](#descripción)
+- [Guía - ¿Cómo ejecutar y testear la aplicación?](#guía---cómo-ejecutar-y-testear-la-aplicación)
+  - [Clonado del repositorio](#clonado-del-repositorio)
+  - [Crear imágenes, volúmenes y contenedores](#creación-de-imágenes-volúmenes-y-contenedores-mediante-docker-compose)
+  - [Preprocesamiento y entrenamiento mediante DAG](#preprocesamiento-de-dataset-y-entrenamiento-de-modelo)
+  - [Realizar predicciones](#realizar-predicciones-mediante-rest-api)
+- [Diagram](#diagrama)
+- [Entregas](#entregas)
+- [Estructura de carpetas](#estructura-de-carpetas)
+- [Comandos útiles](#comandos-útiles)
+
 ## Descripción
 
 Implementación de un modelo de Machine Learning basado en el [Body Fat Prediction Dataset](https://www.kaggle.com/datasets/fedesoriano/body-fat-prediction-dataset) en un entorno productivo simulado con **Docker Compose**.  
@@ -176,7 +189,7 @@ En cuanto al `<host>` y `<port>`, estos son:
 
 ![postman-post](./images/postman-post.png)
 
-### Diagrama
+## Diagrama
 
 ![diagrama](./diagrams/arquitectura.drawio.png)
 
@@ -198,6 +211,8 @@ En cuanto al `<host>` y `<port>`, estos son:
 1. La **REST API** consume el modelo desde **s3**, realiza la inferencia, y genera un resultado para el *Usuario Final*.
 1. La **REST API** le devuelve un *response* con la inferencia al *Usuario Final*.
 
+## Entregas
+
 ### Entrega 1
 
 - Servicios containerizados (*MLFlow*, *Airflow*, s3, *PostgreSQL*)
@@ -212,7 +227,7 @@ En cuanto al `<host>` y `<port>`, estos son:
 - API usando modelo en Production.
 - Documentación + tests básicos.
 
-### 📂 Estructura de carpetas
+## Estructura de carpetas
 
 ```YAML
 │
@@ -268,7 +283,7 @@ En cuanto al `<host>` y `<port>`, estos son:
 └── requirements.txt
 ```
 
-### Comandos útiles
+## Comandos útiles
 
 Se listan a continuación varios comandos útiles de `docker`:
 
