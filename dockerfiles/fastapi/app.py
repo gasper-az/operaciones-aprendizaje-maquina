@@ -2,10 +2,11 @@ import mlflow
 import os
 import sys
 import pandas as pd
+import pickle
 
 from typing import Any, Tuple
 
-from fastapi import FastAPI, Body
+from fastapi import FastAPI, Body, BackgroundTasks
 from fastapi.responses import JSONResponse
 from fastapi.encoders import jsonable_encoder
 from pydantic import BaseModel, Field
@@ -43,14 +44,23 @@ def cargar_modelo(name: str, alias: str) -> Tuple[Any, int]:
     Returns:
         Tuple[Any, int]: modelo de ML junto a su versión.
     """
-    mlflow.set_tracking_uri(MLFLOW_TRACKING_URL)
-    client = mlflow.MlflowClient()
+    try:
 
-    data = client.get_model_version_by_alias(name=name, alias=alias)
-    model = mlflow.sklearn.load_model(data.source)
-    version = int(data.version)
+        mlflow.set_tracking_uri(MLFLOW_TRACKING_URL)
+        client = mlflow.MlflowClient()
 
-    return model, version
+        data = client.get_model_version_by_alias(name=name, alias=alias)
+        model = mlflow.sklearn.load_model(data.source)
+        version = int(data.version)
+
+        return model, version
+    except:
+        file_ml = open('/app/data/model.pkl', 'rb')
+        model = pickle.load(file_ml)
+        file_ml.close()
+        version = 0
+
+        return model, version
 
 def cargar_train_data() -> Tuple[pd.DataFrame, pd.Series]:
     """
@@ -58,10 +68,16 @@ def cargar_train_data() -> Tuple[pd.DataFrame, pd.Series]:
     Returns
         Tuple[pd.DataFrame, pd.Series]: X_train, y_train.
     """
-    train_path = os.path.join(S3_DATA_PRE_PROCESSED, TRAIN_SUBFOLDER)
+    try:
+        train_path = os.path.join(S3_DATA_PRE_PROCESSED, TRAIN_SUBFOLDER)
 
-    X_train, y_train = load_data(base_path=train_path, x_name=X_CSV, y_name=Y_CSV)
-    return X_train, y_train
+        X_train, y_train = load_data(base_path=train_path, x_name=X_CSV, y_name=Y_CSV)
+        return X_train, y_train
+    except:
+        # Si falla, se cargan los datos montados en el container
+        X_train = pd.read_csv(os.path.join("/app/data/", X_CSV))
+        y_train = pd.read_csv(os.path.join("/app/data/", Y_CSV))
+        return X_train, y_train
 
 class ModelInput(BaseModel):
     """
@@ -262,6 +278,18 @@ def preprocesar(X_train:pd.DataFrame, X_test: pd.DataFrame) -> Tuple[pd.DataFram
 # Carga de Modelo para predicción.
 modelo, version = cargar_modelo(name=MODEL_NAME, alias=MODEL_ALIAS)
 
+def force_update_model():
+    """
+    Fuerza el update del modelo y su versión.
+    """
+    global modelo
+    global version
+
+    try:
+        modelo, version = cargar_modelo(name=MODEL_NAME, alias=MODEL_ALIAS)
+    except:
+        pass
+
 app = FastAPI()
 
 @app.get("/")
@@ -279,6 +307,7 @@ def predict(
         ModelInput,
         Body(embed=True),
     ],
+    background_tasks: BackgroundTasks    
 ):
     df = model_to_dataframe(model=features)
     
@@ -291,4 +320,7 @@ def predict(
 
     prediccion_value = prediccion[0].item()
     prediccion_str = f"El valor de `Body Fat` predicho es de {prediccion_value}."
+
+    background_tasks.add_task(force_update_model)
+
     return ModelOutput(prediccion=prediccion_value, prediccion_str=prediccion_str)
