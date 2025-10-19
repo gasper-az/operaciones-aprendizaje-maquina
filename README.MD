@@ -77,7 +77,7 @@ En esta sección se explican los pasos necesarios para crear las imágenes de do
    1. (recomendado) `docker compose down -v`
       1. Este comando asegura que, en caso de existir, se detengan los servicios de docker compose.
    1. (recomendado) `docker system prune -af --volumes`
-      1. Este comando asegura que, en caso de existir, se eliminen los volúmenes utilizados por docker.
+      1. Este comando asegura que se borren todos los containers, imágenes, volúmenes y redes de docker no utilizadas.
    1. `docker compose build --no-cache`
       1. Este comando fuerza el *build* de las imágenes necesarias, independientemente de si existen en el sistema o no.
       1. Al haber varias imágenes involucradas, la ejecución suele demorar varios minutos.
